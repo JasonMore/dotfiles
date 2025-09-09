@@ -1,0 +1,6 @@
+sudo chsh "$(id -un)" --shell "/usr/bin/zsh"
+
+# Configure git so that 'git push' will automatically set up the remote tracking branch
+echo "[dotfiles] Setting git config: push.autoSetupRemote = true"
+git config --global push.autoSetupRemote true
+git config --global pull.rebase false
