@@ -4,3 +4,8 @@ sudo chsh "$(id -un)" --shell "/usr/bin/zsh"
 echo "[dotfiles] Setting git config: push.autoSetupRemote = true"
 git config --global push.autoSetupRemote true
 git config --global pull.rebase false
+
+# Configure global gitignore to exclude .idea folders
+echo "[dotfiles] Setting up global gitignore"
+DOTFILES_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+git config --global core.excludesfile "${DOTFILES_DIR}/.gitignore_global"
