@@ -9,3 +9,7 @@ git config --global pull.rebase false
 echo "[dotfiles] Setting up global gitignore"
 DOTFILES_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 git config --global core.excludesfile "${DOTFILES_DIR}/.gitignore_global"
+
+if [[ -d "/workspaces/github" && -d "/workspaces/github-ui" ]]; then
+	script/open-with-github-ui
+fi
