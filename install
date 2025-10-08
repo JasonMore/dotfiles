@@ -10,6 +10,9 @@ echo "[dotfiles] Setting up global gitignore"
 DOTFILES_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 git config --global core.excludesfile "${DOTFILES_DIR}/.gitignore_global"
 
+echo "[dotfiles] Linking tmux config"
+ln -sf "${DOTFILES_DIR}/.tmux.conf" "${HOME}/.tmux.conf"
+
 if [[ -d "/workspaces/github" && -d "/workspaces/github-ui" ]]; then
 	script/open-with-github-ui
 fi
