@@ -10,19 +10,20 @@ echo "[dotfiles] Setting up global gitignore"
 DOTFILES_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 git config --global core.excludesfile "${DOTFILES_DIR}/.gitignore_global"
 
+# Tmux config
 echo "[dotfiles] Linking tmux config"
 ln -sf "${DOTFILES_DIR}/.tmux.conf" "${HOME}/.tmux.conf"
 
 if [[ -n "${CODESPACES}" ]]; then
-	OH_MY_ZSH_DIR="${HOME}/.oh-my-zsh"
-	if [[ -d "${OH_MY_ZSH_DIR}" ]]; then
-		echo "[dotfiles] Using existing Oh My Zsh at ${OH_MY_ZSH_DIR}"
-	else
-		echo "[dotfiles] Expected Oh My Zsh at ${OH_MY_ZSH_DIR}, but it was not found" >&2
-	fi
-
 	echo "[dotfiles] Linking zsh config for Codespaces"
 	ln -sf "${DOTFILES_DIR}/.zshrc" "${HOME}/.zshrc"
+
+	if command -v atuin >/dev/null 2>&1; then
+		echo "[dotfiles] Atuin already installed"
+	else command -v cargo >/dev/null 2>&1; then
+		echo "[dotfiles] Installing Atuin"
+		curl --proto '=https' --tlsv1.2 -LsSf https://setup.atuin.sh | sh
+	fi
 fi
 
 if [[ -d "/workspaces/github" && -d "/workspaces/github-ui" ]]; then
