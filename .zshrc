@@ -1,8 +1,9 @@
-# ============ Atuin (history search/sync) ============
-eval "$(atuin init zsh)"
-
 # ============ Starship (prompt) ============
 eval "$(starship init zsh)"
+
+# ============ Atuin (history search/sync) ============
+source $HOME/.atuin/bin/env
+eval "$(atuin init zsh)"
 
 # ============ Git aliases (replace oh-my-zsh plugin) ============
 alias gst='git status'
