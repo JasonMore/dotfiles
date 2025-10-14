@@ -1,3 +1,7 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
 sudo chsh "$(id -un)" --shell "/usr/bin/zsh"
 
 # Configure git so that 'git push' will automatically set up the remote tracking branch
@@ -22,14 +26,20 @@ if [[ -n "${CODESPACES}" ]]; then
 	# Atuin
 	if command -v atuin >/dev/null 2>&1; then
 		echo "[dotfiles] Atuin already installed"
-	else command -v cargo >/dev/null 2>&1; then
+	elif command -v cargo >/dev/null 2>&1; then
 		echo "[dotfiles] Installing Atuin"
 		curl --proto '=https' --tlsv1.2 -LsSf https://setup.atuin.sh | sh
+	else
+		echo "[dotfiles] Skipping Atuin install (cargo unavailable)"
 	fi
 
-	atuin login -u "$ATUIN_USERNAME" -k "$ATUIN_KEY" -p "$ATUIN_PASSWORD"
+	if command -v atuin >/dev/null 2>&1; then
+		atuin login -u "$ATUIN_USERNAME" -k "$ATUIN_KEY" -p "$ATUIN_PASSWORD"
+	else
+		echo "[dotfiles] Skipping Atuin login (atuin command missing)"
+	fi
 fi
 
 if [[ -d "/workspaces/github" && -d "/workspaces/github-ui" ]]; then
-	script/open-with-github-ui
+	"${DOTFILES_DIR}/script/open-with-github-ui"
 fi
