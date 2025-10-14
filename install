@@ -26,11 +26,9 @@ if [[ -n "${CODESPACES}" ]]; then
 	# Atuin
 	if command -v atuin >/dev/null 2>&1; then
 		echo "[dotfiles] Atuin already installed"
-	elif command -v cargo >/dev/null 2>&1; then
+	else
 		echo "[dotfiles] Installing Atuin"
 		curl --proto '=https' --tlsv1.2 -LsSf https://setup.atuin.sh | sh
-	else
-		echo "[dotfiles] Skipping Atuin install (cargo unavailable)"
 	fi
 
 	if command -v atuin >/dev/null 2>&1; then
@@ -38,8 +36,4 @@ if [[ -n "${CODESPACES}" ]]; then
 	else
 		echo "[dotfiles] Skipping Atuin login (atuin command missing)"
 	fi
-fi
-
-if [[ -d "/workspaces/github" && -d "/workspaces/github-ui" ]]; then
-	"${DOTFILES_DIR}/script/open-with-github-ui"
 fi
