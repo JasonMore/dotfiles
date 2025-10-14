@@ -15,15 +15,19 @@ echo "[dotfiles] Linking tmux config"
 ln -sf "${DOTFILES_DIR}/.tmux.conf" "${HOME}/.tmux.conf"
 
 if [[ -n "${CODESPACES}" ]]; then
+	#zsh
 	echo "[dotfiles] Linking zsh config for Codespaces"
 	ln -sf "${DOTFILES_DIR}/.zshrc" "${HOME}/.zshrc"
 
+	# Atuin
 	if command -v atuin >/dev/null 2>&1; then
 		echo "[dotfiles] Atuin already installed"
 	else command -v cargo >/dev/null 2>&1; then
 		echo "[dotfiles] Installing Atuin"
 		curl --proto '=https' --tlsv1.2 -LsSf https://setup.atuin.sh | sh
 	fi
+
+	atuin login -u "$ATUIN_USERNAME" -k "$ATUIN_KEY" -p "$ATUIN_PASSWORD"
 fi
 
 if [[ -d "/workspaces/github" && -d "/workspaces/github-ui" ]]; then
