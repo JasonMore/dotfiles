@@ -1,22 +1,22 @@
-# ============ Starship (prompt) ============
-# eval "$(starship init zsh)"
+# ============ Oh My Zsh (shell framework) ============
+export ZSH="$HOME/.oh-my-zsh"
+ZSH_THEME="robbyrussell"
+plugins=(git)
+
+if [[ -f "${ZSH}/oh-my-zsh.sh" ]]; then
+  source "${ZSH}/oh-my-zsh.sh"
+else
+  echo "[dotfiles] oh-my-zsh not found; skipping framework initialization."
+fi
 
 # ============ Atuin (history search/sync) ============
-source $HOME/.atuin/bin/env
-eval "$(atuin init zsh)"
+if [[ -f "$HOME/.atuin/bin/env" ]]; then
+  source "$HOME/.atuin/bin/env"
+fi
 
-# ============ Git aliases (replace oh-my-zsh plugin) ============
-alias gst='git status'
-alias gco='git checkout'
-alias gaa='git add --all'
-alias gcam='git commit --all --message'
-alias gp='git push'
-alias gl='git pull'
-alias grh='git reset --hard'
-alias gcl='git clone'
-alias gdf='git diff'
-alias gbr='git branch'
-alias gsw='git switch'
+if command -v atuin >/dev/null 2>&1; then
+  eval "$(atuin init zsh)"
+fi
 
 # ============ History behavior ============
 HISTFILE=~/.zsh_history

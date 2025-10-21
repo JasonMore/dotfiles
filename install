@@ -20,10 +20,15 @@ ln -sf "${DOTFILES_DIR}/.tmux.conf" "${HOME}/.tmux.conf"
 
 if [[ -n "${CODESPACES}" ]]; then
 
-	# starship
-	# curl -fsSL https://starship.rs/install.sh | sh -s -- -y -b "/usr/local/bin"
+	# oh-my-zsh (shell framework)
+	if [[ -d "${HOME}/.oh-my-zsh" ]]; then
+		echo "[dotfiles] oh-my-zsh already installed"
+	else
+		echo "[dotfiles] Installing oh-my-zsh"
+		git clone --depth=1 https://github.com/ohmyzsh/ohmyzsh.git "${HOME}/.oh-my-zsh"
+	fi
 
-	#zsh
+	# zsh config
 	echo "[dotfiles] Linking zsh config for Codespaces"
 	ln -sf "${DOTFILES_DIR}/.zshrc" "${HOME}/.zshrc"
 
