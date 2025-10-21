@@ -21,7 +21,7 @@ ln -sf "${DOTFILES_DIR}/.tmux.conf" "${HOME}/.tmux.conf"
 if [[ -n "${CODESPACES}" ]]; then
 
 	# starship
-	curl -fsSL https://starship.rs/install.sh | sh -s -- -y -b "/usr/local/bin"
+	# curl -fsSL https://starship.rs/install.sh | sh -s -- -y -b "/usr/local/bin"
 
 	#zsh
 	echo "[dotfiles] Linking zsh config for Codespaces"

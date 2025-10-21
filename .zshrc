@@ -1,5 +1,5 @@
 # ============ Starship (prompt) ============
-eval "$(starship init zsh)"
+# eval "$(starship init zsh)"
 
 # ============ Atuin (history search/sync) ============
 source $HOME/.atuin/bin/env
@@ -9,7 +9,7 @@ eval "$(atuin init zsh)"
 alias gst='git status'
 alias gco='git checkout'
 alias gaa='git add --all'
-alias gcmsg='git commit -m'
+alias gcam='git commit --all --message'
 alias gp='git push'
 alias gl='git pull'
 alias grh='git reset --hard'
