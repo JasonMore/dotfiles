@@ -46,7 +46,4 @@ if [[ -n "${CODESPACES}" ]]; then
 	else
 		echo "[dotfiles] Skipping Atuin login (atuin command missing)"
 	fi
-
-	# install one password
-	./script/install_1password_cli
 fi
