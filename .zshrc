@@ -23,3 +23,14 @@ HISTFILE=~/.zsh_history
 HISTSIZE=20000
 SAVEHIST=20000
 setopt SHARE_HISTORY HIST_IGNORE_ALL_DUPS
+
+# ============ Copilot CLI ============
+export COPILOT_ALLOW_ALL=true
+
+cpi() {
+  if [[ -n "$1" ]]; then
+    copilot --add-dir /workspaces -p "$*"
+  else
+    copilot --add-dir /workspaces
+  fi
+}
