@@ -34,3 +34,6 @@ cpi() {
     copilot --add-dir /workspaces
   fi
 }
+
+# ============ Aliases ============
+alias ff='script/toggle-feature-flag'
