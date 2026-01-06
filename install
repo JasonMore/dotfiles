@@ -50,23 +50,10 @@ if [[ -n "${CODESPACES}" ]]; then
 	# Copilot CLI MCP servers
 	echo "[dotfiles] Setting up MCP servers for Copilot CLI"
 	mkdir -p "${HOME}/.copilot"
-	cat > "${HOME}/.copilot/mcp.json" << 'EOF'
-{
-  "servers": {
-    "github-mcp-server": {
-      "type": "stdio",
-      "command": "/workspaces/github-ui/script/github-mcp-server"
-    },
-    "github-graphql": {
-      "type": "stdio",
-      "command": "/workspaces/github-ui/script/github-graphql-mcp-server"
-    },
-    "primer": {
-      "type": "stdio",
-      "command": "npx",
-      "args": ["@primer/mcp@latest"]
-    }
-  }
-}
-EOF
+	if [[ -f "/workspaces/github-ui/.vscode/mcp.json" ]]; then
+		cp "/workspaces/github-ui/.vscode/mcp.json" "${HOME}/.copilot/mcp.json"
+		echo "[dotfiles] Copied MCP servers from VS Code configuration"
+	else
+		echo "[dotfiles] Warning: /workspaces/github-ui/.vscode/mcp.json not found, skipping MCP setup"
+	fi
 fi
