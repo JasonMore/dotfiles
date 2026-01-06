@@ -46,4 +46,27 @@ if [[ -n "${CODESPACES}" ]]; then
 	else
 		echo "[dotfiles] Skipping Atuin login (atuin command missing)"
 	fi
+
+	# Copilot CLI MCP servers
+	echo "[dotfiles] Setting up MCP servers for Copilot CLI"
+	mkdir -p ~/.copilot
+	cat > ~/.copilot/mcp.json << 'EOF'
+{
+  "servers": {
+    "github-mcp-server": {
+      "type": "stdio",
+      "command": "/workspaces/github-ui/script/github-mcp-server"
+    },
+    "github-graphql": {
+      "type": "stdio",
+      "command": "/workspaces/github-ui/script/github-graphql-mcp-server"
+    },
+    "primer": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["@primer/mcp@latest"]
+    }
+  }
+}
+EOF
 fi
