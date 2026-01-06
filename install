@@ -49,8 +49,8 @@ if [[ -n "${CODESPACES}" ]]; then
 
 	# Copilot CLI MCP servers
 	echo "[dotfiles] Setting up MCP servers for Copilot CLI"
-	mkdir -p ~/.copilot
-	cat > ~/.copilot/mcp.json << 'EOF'
+	mkdir -p "${HOME}/.copilot"
+	cat > "${HOME}/.copilot/mcp.json" << 'EOF'
 {
   "servers": {
     "github-mcp-server": {
