@@ -58,7 +58,7 @@ if [[ -n "${CODESPACES}" ]]; then
 			echo "[dotfiles] Converted and copied MCP servers from VS Code configuration"
 		else
 			# Fallback: use sed to rename the key if jq is not available
-			sed 's/^[[:space:]]*"servers"/"mcpServers"/' "/workspaces/github-ui/.vscode/mcp.json" > "${HOME}/.copilot/mcp-config.json"
+			sed 's/^[[:space:]]*"servers"/"mcpServers"/g' "/workspaces/github-ui/.vscode/mcp.json" > "${HOME}/.copilot/mcp-config.json"
 			echo "[dotfiles] Converted and copied MCP servers from VS Code configuration (using sed)"
 		fi
 	else
