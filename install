@@ -51,8 +51,16 @@ if [[ -n "${CODESPACES}" ]]; then
 	echo "[dotfiles] Setting up MCP servers for Copilot CLI"
 	mkdir -p "${HOME}/.copilot"
 	if [[ -f "/workspaces/github-ui/.vscode/mcp.json" ]]; then
-		cp "/workspaces/github-ui/.vscode/mcp.json" "${HOME}/.copilot/mcp-config.json"
-		echo "[dotfiles] Copied MCP servers from VS Code configuration"
+		# Convert VS Code MCP format (uses "servers") to Copilot CLI format (uses "mcpServers")
+		if command -v jq >/dev/null 2>&1; then
+			jq 'if has("servers") then {mcpServers: .servers} else . end' \
+				"/workspaces/github-ui/.vscode/mcp.json" > "${HOME}/.copilot/mcp-config.json"
+			echo "[dotfiles] Converted and copied MCP servers from VS Code configuration"
+		else
+			# Fallback: use sed to rename the key if jq is not available
+			sed 's/"servers"/"mcpServers"/' "/workspaces/github-ui/.vscode/mcp.json" > "${HOME}/.copilot/mcp-config.json"
+			echo "[dotfiles] Converted and copied MCP servers from VS Code configuration (using sed)"
+		fi
 	else
 		echo "[dotfiles] Warning: /workspaces/github-ui/.vscode/mcp.json not found, skipping MCP setup"
 	fi
