@@ -53,13 +53,21 @@ if [[ -n "${CODESPACES}" ]]; then
 	if [[ -f "/workspaces/github-ui/.vscode/mcp.json" ]]; then
 		# Convert VS Code MCP format (uses "servers") to Copilot CLI format (uses "mcpServers")
 		if command -v jq >/dev/null 2>&1; then
-			jq 'if has("servers") then {mcpServers: .servers} else . end' \
-				"/workspaces/github-ui/.vscode/mcp.json" > "${HOME}/.copilot/mcp-config.json"
-			echo "[dotfiles] Converted and copied MCP servers from VS Code configuration"
+			if jq 'if has("servers") then {mcpServers: .servers} else . end' \
+				"/workspaces/github-ui/.vscode/mcp.json" > "${HOME}/.copilot/mcp-config.json"; then
+				echo "[dotfiles] Converted and copied MCP servers from VS Code configuration"
+			else
+				echo "[dotfiles] Error: Failed to convert MCP configuration with jq"
+				rm -f "${HOME}/.copilot/mcp-config.json"
+			fi
 		else
 			# Fallback: use sed to rename the key if jq is not available
-			sed 's/^[[:space:]]*"servers"/"mcpServers"/g' "/workspaces/github-ui/.vscode/mcp.json" > "${HOME}/.copilot/mcp-config.json"
-			echo "[dotfiles] Converted and copied MCP servers from VS Code configuration (using sed)"
+			if sed 's/^[[:space:]]*"servers"/"mcpServers"/g' "/workspaces/github-ui/.vscode/mcp.json" > "${HOME}/.copilot/mcp-config.json"; then
+				echo "[dotfiles] Converted and copied MCP servers from VS Code configuration (using sed)"
+			else
+				echo "[dotfiles] Error: Failed to convert MCP configuration with sed"
+				rm -f "${HOME}/.copilot/mcp-config.json"
+			fi
 		fi
 	else
 		echo "[dotfiles] Warning: /workspaces/github-ui/.vscode/mcp.json not found, skipping MCP setup"
