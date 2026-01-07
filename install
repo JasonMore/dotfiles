@@ -51,7 +51,7 @@ if [[ -n "${CODESPACES}" ]]; then
 	echo "[dotfiles] Setting up MCP servers for Copilot CLI"
 	mkdir -p "${HOME}/.copilot"
 	if [[ -f "/workspaces/github-ui/.vscode/mcp.json" ]]; then
-		cp "/workspaces/github-ui/.vscode/mcp.json" "${HOME}/.copilot/mcp.json"
+		cp "/workspaces/github-ui/.vscode/mcp.json" "${HOME}/.copilot/mcp-config.json"
 		echo "[dotfiles] Copied MCP servers from VS Code configuration"
 	else
 		echo "[dotfiles] Warning: /workspaces/github-ui/.vscode/mcp.json not found, skipping MCP setup"
