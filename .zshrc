@@ -60,30 +60,41 @@ memup() {
   # Use node to update the package.json with increased memory settings
   node -e "
     const fs = require('fs');
-    const packagePath = '$package_json';
-    const pkg = JSON.parse(fs.readFileSync(packagePath, 'utf8'));
+    const packagePath = process.argv[1];
     
-    const scriptsToUpdate = ['webpack', 'webpack:alloy', 'webpack:alloy:serve', 'webpack:css:serve'];
-    const memoryFlag = '--max-old-space-size=12288';
-    
-    scriptsToUpdate.forEach(scriptName => {
-      if (pkg.scripts && pkg.scripts[scriptName]) {
-        let script = pkg.scripts[scriptName];
-        // Remove existing max-old-space-size flags
-        script = script.replace(/--max-old-space-size=\d+\s*/g, '');
-        // Add the new flag at the beginning if it starts with node
-        if (script.startsWith('node ')) {
-          script = 'node ' + memoryFlag + ' ' + script.substring(5);
-        } else {
-          // For other commands, prepend NODE_OPTIONS
-          script = 'NODE_OPTIONS=\"' + memoryFlag + '\" ' + script;
+    try {
+      const pkg = JSON.parse(fs.readFileSync(packagePath, 'utf8'));
+      
+      const scriptsToUpdate = ['webpack', 'webpack:alloy', 'webpack:alloy:serve', 'webpack:css:serve'];
+      const memoryFlag = '--max-old-space-size=12288';
+      
+      scriptsToUpdate.forEach(scriptName => {
+        if (pkg.scripts && pkg.scripts[scriptName]) {
+          let script = pkg.scripts[scriptName];
+          // Remove existing max-old-space-size flags
+          script = script.replace(/--max-old-space-size=\d+\s*/g, '');
+          // Add the new flag at the beginning if it starts with node
+          if (script.startsWith('node ')) {
+            script = 'node ' + memoryFlag + ' ' + script.substring(5);
+          } else {
+            // For other commands, prepend NODE_OPTIONS
+            script = 'NODE_OPTIONS=' + memoryFlag + ' ' + script;
+          }
+          pkg.scripts[scriptName] = script;
         }
-        pkg.scripts[scriptName] = script;
-      }
-    });
-    
-    fs.writeFileSync(packagePath, JSON.stringify(pkg, null, 2) + '\n');
-  "
+      });
+      
+      fs.writeFileSync(packagePath, JSON.stringify(pkg, null, 2) + '\n');
+    } catch (error) {
+      console.error('Error updating package.json:', error.message);
+      process.exit(1);
+    }
+  " "$package_json"
+  
+  if [[ $? -ne 0 ]]; then
+    echo "Error: Failed to update memory settings in package.json"
+    return 1
+  fi
   
   echo "Memory settings updated successfully!"
   echo "Modified scripts: webpack, webpack:alloy, webpack:alloy:serve, webpack:css:serve"
