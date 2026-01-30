@@ -65,24 +65,12 @@ memup() {
     try {
       const pkg = JSON.parse(fs.readFileSync(packagePath, 'utf8'));
       
-      const scriptsToUpdate = ['webpack', 'webpack:alloy', 'webpack:alloy:serve', 'webpack:css:serve'];
-      const memoryFlag = '--max-old-space-size=12288';
-      
-      scriptsToUpdate.forEach(scriptName => {
-        if (pkg.scripts && pkg.scripts[scriptName]) {
-          let script = pkg.scripts[scriptName];
-          // Remove existing max-old-space-size flags
-          script = script.replace(/--max-old-space-size=\d+\s*/g, '');
-          // Add the new flag at the beginning if it starts with node
-          if (script.startsWith('node ')) {
-            script = 'node ' + memoryFlag + ' ' + script.substring(5);
-          } else {
-            // For other commands, prepend NODE_OPTIONS
-            script = 'NODE_OPTIONS=' + memoryFlag + ' ' + script;
-          }
-          pkg.scripts[scriptName] = script;
-        }
-      });
+      // Globally replace all max-old-space-size values with 22288
+      if (pkg.scripts) {
+        Object.keys(pkg.scripts).forEach(scriptName => {
+          pkg.scripts[scriptName] = pkg.scripts[scriptName].replace(/--max-old-space-size=\d+/g, '--max-old-space-size=22288');
+        });
+      }
       
       fs.writeFileSync(packagePath, JSON.stringify(pkg, null, 2) + '\n');
     } catch (error) {
@@ -97,7 +85,7 @@ memup() {
   fi
   
   echo "Memory settings updated successfully!"
-  echo "Modified scripts: webpack, webpack:alloy, webpack:alloy:serve, webpack:css:serve"
+  echo "All scripts with max-old-space-size have been updated to 22288"
 }
 
 reset-memup() {
