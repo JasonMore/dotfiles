@@ -66,7 +66,7 @@ memup() {
       const pkg = JSON.parse(fs.readFileSync(packagePath, 'utf8'));
       
       const scriptsToUpdate = ['webpack', 'webpack:alloy', 'webpack:alloy:serve', 'webpack:css:serve'];
-      const memoryFlag = '--max-old-space-size=12288';
+      const memoryFlag = '--max-old-space-size=22288';
       
       scriptsToUpdate.forEach(scriptName => {
         if (pkg.scripts && pkg.scripts[scriptName]) {
