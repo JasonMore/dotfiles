@@ -50,18 +50,19 @@ if [[ -n "${CODESPACES}" ]]; then
 	# Copilot CLI MCP servers
 	echo "[dotfiles] Setting up MCP servers for Copilot CLI"
 	mkdir -p "${HOME}/.copilot"
-	if [[ -f "/workspaces/github-ui/.vscode/mcp.json" ]]; then
+	MCP_SOURCE="/workspaces/github-ui/.vscode/mcp.json"
+	if [[ -f "${MCP_SOURCE}" ]]; then
 		# Validate JSON before copying
-		if python3 -m json.tool "/workspaces/github-ui/.vscode/mcp.json" > /dev/null 2>&1; then
-			cp "/workspaces/github-ui/.vscode/mcp.json" "${HOME}/.copilot/mcp-config.json"
+		if python3 -m json.tool "${MCP_SOURCE}" > /dev/null 2>&1; then
+			cp "${MCP_SOURCE}" "${HOME}/.copilot/mcp-config.json"
 			echo "[dotfiles] Copied MCP servers from VS Code configuration"
 		else
-			echo "[dotfiles] ERROR: Invalid JSON in /workspaces/github-ui/.vscode/mcp.json"
+			echo "[dotfiles] ERROR: Invalid JSON in ${MCP_SOURCE}"
 			echo "[dotfiles] Please fix the JSON syntax errors before running install"
-			python3 -m json.tool "/workspaces/github-ui/.vscode/mcp.json" 2>&1 | head -10
+			python3 -m json.tool "${MCP_SOURCE}" 2>&1 | head -10
 			exit 1
 		fi
 	else
-		echo "[dotfiles] Warning: /workspaces/github-ui/.vscode/mcp.json not found, skipping MCP setup"
+		echo "[dotfiles] Warning: ${MCP_SOURCE} not found, skipping MCP setup"
 	fi
 fi
