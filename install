@@ -53,13 +53,14 @@ if [[ -n "${CODESPACES}" ]]; then
 	MCP_SOURCE="/workspaces/github-ui/.vscode/mcp.json"
 	if [[ -f "${MCP_SOURCE}" ]]; then
 		# Validate JSON before copying
-		if python3 -m json.tool "${MCP_SOURCE}" > /dev/null 2>&1; then
+		JSON_ERROR=$(python3 -m json.tool "${MCP_SOURCE}" 2>&1 > /dev/null)
+		if [[ $? -eq 0 ]]; then
 			cp "${MCP_SOURCE}" "${HOME}/.copilot/mcp-config.json"
 			echo "[dotfiles] Copied MCP servers from VS Code configuration"
 		else
 			echo "[dotfiles] ERROR: Invalid JSON in ${MCP_SOURCE}"
 			echo "[dotfiles] Please fix the JSON syntax errors before running install"
-			python3 -m json.tool "${MCP_SOURCE}" 2>&1 | head -10
+			echo "${JSON_ERROR}" | head -10
 			exit 1
 		fi
 	else
