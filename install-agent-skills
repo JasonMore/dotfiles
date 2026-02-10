@@ -47,6 +47,7 @@ if [[ -d "${TEMP_DIR}/.github/skills" ]]; then
     echo "[agent-skills] Successfully installed ${SKILL_COUNT} skills"
 else
     echo "[agent-skills] Error: Skills directory not found in cloned repository"
+    rm -rf "${TEMP_DIR}"
     exit 1
 fi
 
