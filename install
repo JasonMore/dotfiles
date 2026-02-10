@@ -56,4 +56,14 @@ if [[ -n "${CODESPACES}" ]]; then
 	else
 		echo "[dotfiles] Warning: /workspaces/github-ui/.vscode/mcp.json not found, skipping MCP setup"
 	fi
+
+	# Copilot CLI skills
+	echo "[dotfiles] Setting up Copilot skills"
+	if [[ -d "${DOTFILES_DIR}/.copilot/skills" ]]; then
+		mkdir -p "${HOME}/.copilot/skills"
+		cp -r "${DOTFILES_DIR}/.copilot/skills/"* "${HOME}/.copilot/skills/"
+		echo "[dotfiles] Copied Copilot skills from ${DOTFILES_DIR}/.copilot/skills/"
+	else
+		echo "[dotfiles] Warning: ${DOTFILES_DIR}/.copilot/skills not found, skipping skills setup"
+	fi
 fi
