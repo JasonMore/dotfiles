@@ -1,6 +1,6 @@
 ---
 name: editorial-style
-description: Enforces editorial style guidelines and prevents use of em dash.
+description: Enforces editorial style guidelines and prevents use of the em dash.
 ---
 
 ## Purpose
