@@ -56,4 +56,8 @@ if [[ -n "${CODESPACES}" ]]; then
 	else
 		echo "[dotfiles] Warning: /workspaces/github-ui/.vscode/mcp.json not found, skipping MCP setup"
 	fi
+
+	# Install agent skills
+	echo "[dotfiles] Installing agent skills"
+	"${DOTFILES_DIR}/install-agent-skills"
 fi
