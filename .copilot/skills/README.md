@@ -67,7 +67,7 @@ If you want to install the skills manually:
 
 ```bash
 mkdir -p ~/.copilot/skills
-cp -r /path/to/dotfiles/.copilot/skills/* ~/.copilot/skills/
+cp -r ~/dotfiles/.copilot/skills/* ~/.copilot/skills/
 ```
 
 ## Skill Structure
@@ -91,12 +91,13 @@ Once installed, these skills will be available to GitHub Copilot across all your
 To update the skills after making changes to the repository:
 
 ```bash
-cd /path/to/dotfiles
+cd ~/dotfiles
 cp -r .copilot/skills/* ~/.copilot/skills/
 ```
 
 Or simply re-run the install script:
 
 ```bash
+cd ~/dotfiles
 ./install
 ```
