@@ -1,6 +1,6 @@
 ---
 name: merge-from-main
-description: steps to take every time requested a merge from main for branch or PR
+description: steps to take every time requesting a merge from main for branch or PR
 license: MIT
 author: JasonMore
 tags: [git, merge, ci, testing]
@@ -19,6 +19,6 @@ Follow these steps every time you need to merge from main for a branch or PR:
    2. lint
    3. test
 5. Fix any failure, run step 4 again
-6. DO NOT COMMIT THE CHANGES OR PUSH TO MAIN
+6. Commit and push the merge to your PR branch (DO NOT push directly to main)
 7. Once all local checks are passing, invoke the watch-ci skill to monitor the PR's CI/CD checks in the background
 8. The watch-ci skill will notify when all CI checks complete (pass or fail)
