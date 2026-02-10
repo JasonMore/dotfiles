@@ -5,22 +5,18 @@ set -euo pipefail
 echo "[agent-skills] Installing agent skills from microsoft/skills repository"
 
 # Define directories
-TEMP_DIR="/tmp/agent-skills-install"
+TEMP_DIR=$(mktemp -d)
 SKILLS_REPO="https://github.com/microsoft/skills.git"
 TARGET_DIR="${HOME}/.github/skills"
 
-# Clean up temp directory if it exists
-if [[ -d "${TEMP_DIR}" ]]; then
-    echo "[agent-skills] Cleaning up existing temp directory"
-    rm -rf "${TEMP_DIR}"
-fi
-
-# Create temp directory
-mkdir -p "${TEMP_DIR}"
-
 # Clone the microsoft/skills repository
 echo "[agent-skills] Cloning microsoft/skills repository..."
-git clone --depth=1 "${SKILLS_REPO}" "${TEMP_DIR}"
+if ! git clone --depth=1 "${SKILLS_REPO}" "${TEMP_DIR}"; then
+    echo "[agent-skills] Error: Failed to clone microsoft/skills repository"
+    echo "[agent-skills] Please check your network connection and try again"
+    rm -rf "${TEMP_DIR}"
+    exit 1
+fi
 
 # Create target directory
 echo "[agent-skills] Creating target directory: ${TARGET_DIR}"
@@ -39,7 +35,12 @@ if [[ -d "${TEMP_DIR}/.github/skills" ]]; then
         if [[ -d "${skill_dir}" ]]; then
             skill_name=$(basename "${skill_dir}")
             echo "[agent-skills]   - Installing: ${skill_name}"
-            cp -r "${skill_dir}" "${TARGET_DIR}/${skill_name}"
+            if ! cp -r "${skill_dir}" "${TARGET_DIR}/${skill_name}"; then
+                echo "[agent-skills] Error: Failed to copy skill '${skill_name}'"
+                echo "[agent-skills] Please check permissions and disk space"
+                rm -rf "${TEMP_DIR}"
+                exit 1
+            fi
         fi
     done
     
