@@ -2,17 +2,17 @@
 
 set -euo pipefail
 
-echo "[agent-skills] Installing agent skills from microsoft/skills repository"
+echo "[agent-skills] Installing agent skills from github/agent-skills repository"
 
 # Define directories
 TEMP_DIR=$(mktemp -d)
-SKILLS_REPO="https://github.com/microsoft/skills.git"
+SKILLS_REPO="https://github.com/github/agent-skills.git"
 TARGET_DIR="${HOME}/.github/skills"
 
-# Clone the microsoft/skills repository
-echo "[agent-skills] Cloning microsoft/skills repository..."
+# Clone the github/agent-skills repository
+echo "[agent-skills] Cloning github/agent-skills repository..."
 if ! git clone --depth=1 "${SKILLS_REPO}" "${TEMP_DIR}"; then
-    echo "[agent-skills] Error: Failed to clone microsoft/skills repository"
+    echo "[agent-skills] Error: Failed to clone github/agent-skills repository"
     echo "[agent-skills] Please check your network connection and try again"
     rm -rf "${TEMP_DIR}"
     exit 1
