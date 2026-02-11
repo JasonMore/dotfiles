@@ -35,6 +35,13 @@ cpi() {
   fi
 }
 
+# Load cpi-workspace function (for creating isolated worktrees in codespaces)
+if [[ -f "$HOME/.local/bin/cpi-workspace.sh" ]]; then
+  source "$HOME/.local/bin/cpi-workspace.sh"
+elif [[ -f "$HOME/code/dotfiles/bin/cpi-workspace.sh" ]]; then
+  source "$HOME/code/dotfiles/bin/cpi-workspace.sh"
+fi
+
 # ============ Aliases ============
 alias ff='script/toggle-feature-flag'
 
