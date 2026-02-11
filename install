@@ -75,4 +75,11 @@ if [[ -n "${CODESPACES}" ]]; then
 	else
 		echo "[dotfiles] Warning: ${DOTFILES_DIR}/.copilot/skills not found, skipping skills setup"
 	fi
+
+	# Install cpi-workspace script
+	echo "[dotfiles] Installing cpi-workspace script"
+	mkdir -p "${HOME}/.local/bin"
+	cp "${DOTFILES_DIR}/bin/cpi-workspace.sh" "${HOME}/.local/bin/cpi-workspace.sh"
+	chmod +x "${HOME}/.local/bin/cpi-workspace.sh"
+	echo "[dotfiles] Installed cpi-workspace script to ${HOME}/.local/bin/"
 fi
