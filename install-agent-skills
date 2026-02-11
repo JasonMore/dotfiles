@@ -1,0 +1,62 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+echo "[agent-skills] Installing agent skills from github/agent-skills repository"
+
+# Define directories
+TEMP_DIR=$(mktemp -d)
+SKILLS_REPO="https://github.com/github/agent-skills.git"
+TARGET_DIR="${HOME}/.github/skills"
+
+# Clone the github/agent-skills repository
+echo "[agent-skills] Cloning github/agent-skills repository..."
+if ! git clone --depth=1 "${SKILLS_REPO}" "${TEMP_DIR}"; then
+    echo "[agent-skills] Error: Failed to clone github/agent-skills repository"
+    echo "[agent-skills] Please check your network connection and try again"
+    rm -rf "${TEMP_DIR}"
+    exit 1
+fi
+
+# Create target directory
+echo "[agent-skills] Creating target directory: ${TARGET_DIR}"
+mkdir -p "${TARGET_DIR}"
+
+# Copy all skills from the repository
+if [[ -d "${TEMP_DIR}/.github/skills" ]]; then
+    echo "[agent-skills] Copying skills to ${TARGET_DIR}..."
+    
+    # Count total skills
+    SKILL_COUNT=$(find "${TEMP_DIR}/.github/skills" -mindepth 1 -maxdepth 1 -type d | wc -l)
+    echo "[agent-skills] Found ${SKILL_COUNT} skills to install"
+    
+    # Copy each skill directory
+    for skill_dir in "${TEMP_DIR}/.github/skills"/*; do
+        if [[ -d "${skill_dir}" ]]; then
+            skill_name=$(basename "${skill_dir}")
+            echo "[agent-skills]   - Installing: ${skill_name}"
+            if ! cp -r "${skill_dir}" "${TARGET_DIR}/${skill_name}"; then
+                echo "[agent-skills] Error: Failed to copy skill '${skill_name}'"
+                echo "[agent-skills] Please check permissions and disk space"
+                rm -rf "${TEMP_DIR}"
+                exit 1
+            fi
+        fi
+    done
+    
+    echo "[agent-skills] Successfully installed ${SKILL_COUNT} skills"
+else
+    echo "[agent-skills] Error: Skills directory not found in cloned repository"
+    rm -rf "${TEMP_DIR}"
+    exit 1
+fi
+
+# Clean up temp directory
+echo "[agent-skills] Cleaning up temp directory"
+rm -rf "${TEMP_DIR}"
+
+# List installed skills
+echo "[agent-skills] Installed skills:"
+ls -1 "${TARGET_DIR}"
+
+echo "[agent-skills] Installation complete!"
