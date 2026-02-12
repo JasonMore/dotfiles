@@ -18,6 +18,11 @@ git config --global core.excludesfile "${DOTFILES_DIR}/.gitignore_global"
 echo "[dotfiles] Linking tmux config"
 ln -sf "${DOTFILES_DIR}/.tmux.conf" "${HOME}/.tmux.conf"
 
+# workspace (git worktree helper)
+echo "[dotfiles] Installing workspace script"
+mkdir -p "${HOME}/.local/bin"
+ln -sf "${DOTFILES_DIR}/workspace.sh" "${HOME}/.local/bin/workspace.sh"
+
 if [[ -n "${CODESPACES}" ]]; then
 
 	# oh-my-zsh (shell framework)

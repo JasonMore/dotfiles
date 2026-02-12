@@ -105,3 +105,8 @@ reset-memup() {
   
   echo "package.json has been reset successfully!"
 }
+
+# ============ workspace (git worktree helper) ==========
+if [[ -f "$HOME/.local/bin/workspace.sh" ]]; then
+  source "$HOME/.local/bin/workspace.sh"
+fi
