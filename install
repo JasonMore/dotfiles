@@ -62,9 +62,18 @@ if [[ -n "${CODESPACES}" ]]; then
 		echo "[dotfiles] Warning: /workspaces/github-ui/.vscode/mcp.json not found, skipping MCP setup"
 	fi
 
+	# Copilot agent configuration
+	echo "[dotfiles] Setting up Copilot agent configuration"
+	if [[ -d "${DOTFILES_DIR}/.github/agents" ]]; then
+		mkdir -p "${HOME}/.github/agents"
+		cp -r "${DOTFILES_DIR}/.github/agents/"* "${HOME}/.github/agents/"
+		echo "[dotfiles] Copied Copilot agent configuration"
+	else
+		echo "[dotfiles] Warning: ${DOTFILES_DIR}/.github/agents not found, skipping agent config setup"
 	# Install agent skills
 	echo "[dotfiles] Installing agent skills"
 	"${DOTFILES_DIR}/install-agent-skills"
+  fi
   
 	# Copilot CLI skills
 	echo "[dotfiles] Setting up Copilot skills"
