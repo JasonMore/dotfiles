@@ -60,3 +60,19 @@ echo "[agent-skills] Installed skills:"
 ls -1 "${TARGET_DIR}"
 
 echo "[agent-skills] Installation complete!"
+
+# Install gh-hubber-skills extension
+echo "[agent-skills] Installing gh-hubber-skills extension..."
+if command -v gh >/dev/null 2>&1; then
+    if ! gh extension install --force github/gh-hubber-skills; then
+        echo "[agent-skills] Error: Failed to install gh-hubber-skills extension"
+        exit 1
+    fi
+    if ! gh hubber-skills install --all; then
+        echo "[agent-skills] Error: Failed to run 'gh hubber-skills install --all'"
+        exit 1
+    fi
+    echo "[agent-skills] gh-hubber-skills installed successfully"
+else
+    echo "[agent-skills] Warning: gh not found, skipping gh-hubber-skills installation"
+fi
