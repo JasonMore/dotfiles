@@ -52,16 +52,6 @@ if [[ -n "${CODESPACES}" ]]; then
 		echo "[dotfiles] Skipping Atuin login (atuin command missing)"
 	fi
 
-	# Copilot CLI MCP servers
-	echo "[dotfiles] Setting up MCP servers for Copilot CLI"
-	mkdir -p "${HOME}/.copilot"
-	if [[ -f "/workspaces/github-ui/.vscode/mcp.json" ]]; then
-		cp "/workspaces/github-ui/.vscode/mcp.json" "${HOME}/.copilot/mcp-config.json"
-		echo "[dotfiles] Copied MCP servers from VS Code configuration"
-	else
-		echo "[dotfiles] Warning: /workspaces/github-ui/.vscode/mcp.json not found, skipping MCP setup"
-	fi
-
 	# Copilot agent configuration
 	echo "[dotfiles] Setting up Copilot agent configuration"
 	if [[ -d "${DOTFILES_DIR}/.github/agents" ]]; then
