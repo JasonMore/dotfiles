@@ -59,4 +59,16 @@ rm -rf "${TEMP_DIR}"
 echo "[agent-skills] Installed skills:"
 ls -1 "${TARGET_DIR}"
 
-echo "[agent-skills] Installation complete!"
+echo "[agent-skills] Agent skills installation complete!"
+
+echo "[agent-skills] Installing gh-hubber-skills extension..."
+if ! gh extension install github/gh-hubber-skills; then
+    echo "[agent-skills] Error: Failed to install gh-hubber-skills extension"
+    echo "[agent-skills] Please check your network connection and gh authentication"
+    exit 1
+fi
+if ! gh hubber-skills install --all; then
+    echo "[agent-skills] Error: Failed to run 'gh hubber-skills install --all'"
+    exit 1
+fi
+echo "[agent-skills] gh-hubber-skills installation complete!"
