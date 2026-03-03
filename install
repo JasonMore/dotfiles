@@ -76,6 +76,19 @@ if [[ -n "${CODESPACES}" ]]; then
 		echo "[dotfiles] Warning: ${DOTFILES_DIR}/.copilot/skills not found, skipping skills setup"
 	fi
 
+	# VS Code machine settings
+	echo "[dotfiles] Setting up VS Code machine settings"
+	VSCODE_MACHINE_SETTINGS_DIR="${HOME}/.vscode-remote/data/Machine"
+	mkdir -p "${VSCODE_MACHINE_SETTINGS_DIR}"
+	VSCODE_MACHINE_SETTINGS="${VSCODE_MACHINE_SETTINGS_DIR}/settings.json"
+	if [[ -f "${VSCODE_MACHINE_SETTINGS}" ]] && command -v jq >/dev/null 2>&1; then
+		jq -s '.[0] * .[1]' "${VSCODE_MACHINE_SETTINGS}" "${DOTFILES_DIR}/vscode/settings.json" > /tmp/vscode-settings-merged.json \
+			&& mv /tmp/vscode-settings-merged.json "${VSCODE_MACHINE_SETTINGS}"
+	else
+		cp "${DOTFILES_DIR}/vscode/settings.json" "${VSCODE_MACHINE_SETTINGS}"
+	fi
+	echo "[dotfiles] Applied VS Code machine settings"
+
 	# Install Copilot coder plugin
 	echo "[dotfiles] Installing Copilot coder plugin"
 	"${DOTFILES_DIR}/install-copilot-plugin"
