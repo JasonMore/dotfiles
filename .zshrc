@@ -26,6 +26,7 @@ setopt SHARE_HISTORY HIST_IGNORE_ALL_DUPS
 
 # ============ Copilot CLI ============
 export COPILOT_ALLOW_ALL=true
+export GH_REVIEW_LAB_CHANNEL=github-ui-ops
 
 cpi() {
   if [[ -n "$1" ]]; then
