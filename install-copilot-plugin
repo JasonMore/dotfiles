@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+echo "[copilot-plugin] Installing copilot-coder-plugin"
+
+PLUGIN_REPO="github/copilot-coder-plugin"
+COPILOT_PLUGINS_DIR="${HOME}/.copilot/plugins"
+
+# Create plugins directory if it doesn't exist
+mkdir -p "${COPILOT_PLUGINS_DIR}"
+
+# Check if plugin is already installed
+if [[ -d "${COPILOT_PLUGINS_DIR}/copilot-coder-plugin" ]]; then
+    echo "[copilot-plugin] Plugin already installed at ${COPILOT_PLUGINS_DIR}/copilot-coder-plugin"
+    echo "[copilot-plugin] Updating plugin..."
+    cd "${COPILOT_PLUGINS_DIR}/copilot-coder-plugin"
+    if git pull --ff-only; then
+        echo "[copilot-plugin] Plugin updated successfully"
+        exit 0
+    else
+        echo "[copilot-plugin] Warning: Update failed, will try fresh install"
+        cd -
+        rm -rf "${COPILOT_PLUGINS_DIR}/copilot-coder-plugin"
+    fi
+fi
+
+# Clone the plugin repository
+echo "[copilot-plugin] Cloning ${PLUGIN_REPO} to ${COPILOT_PLUGINS_DIR}..."
+if git clone "https://github.com/${PLUGIN_REPO}.git" "${COPILOT_PLUGINS_DIR}/copilot-coder-plugin"; then
+    echo "[copilot-plugin] Successfully installed copilot-coder-plugin"
+    echo "[copilot-plugin] Plugin location: ${COPILOT_PLUGINS_DIR}/copilot-coder-plugin"
+    echo ""
+    echo "[copilot-plugin] ✓ Installation complete!"
+    echo "[copilot-plugin] The plugin will be available next time you start Copilot CLI"
+else
+    echo "[copilot-plugin] Error: Installation failed"
+    echo "[copilot-plugin] Please check your network connection and authentication"
+    exit 1
+fi

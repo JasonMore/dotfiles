@@ -60,10 +60,11 @@ if [[ -n "${CODESPACES}" ]]; then
 		echo "[dotfiles] Copied Copilot agent configuration"
 	else
 		echo "[dotfiles] Warning: ${DOTFILES_DIR}/.github/agents not found, skipping agent config setup"
+	fi
+
 	# Install agent skills
 	echo "[dotfiles] Installing agent skills"
 	"${DOTFILES_DIR}/install-agent-skills"
-  fi
   
 	# Copilot CLI skills
 	echo "[dotfiles] Setting up Copilot skills"
@@ -74,4 +75,8 @@ if [[ -n "${CODESPACES}" ]]; then
 	else
 		echo "[dotfiles] Warning: ${DOTFILES_DIR}/.copilot/skills not found, skipping skills setup"
 	fi
+
+	# Install Copilot coder plugin
+	echo "[dotfiles] Installing Copilot coder plugin"
+	"${DOTFILES_DIR}/install-copilot-plugin"
 fi
