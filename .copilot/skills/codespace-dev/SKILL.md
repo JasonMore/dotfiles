@@ -262,7 +262,12 @@ Chrome MCP can take screenshots of the local dev app. To add them to a PR descri
   ```bash
   gh cs ssh -c NAME -- 'export PATH="/workspaces/github/vendor/node:/workspaces/github/vendor/node/bin:$PATH" && node --version'
   ```
-  **Root cause:** `.devcontainer/sshrc` adds Go to `/etc/profile` for SSH but skips Node. The `remoteEnv.PATH` in `devcontainer.json` includes `/workspaces/github/vendor/node` — but only for VS Code terminals, not SSH.
+  **Root cause:** `.devcontainer/sshrc` adds Go to `/etc/profile` for SSH but skips Node. To fix permanently, add this to `.devcontainer/sshrc`:
+  ```bash
+  if ! grep -q ':/workspaces/github/vendor/node' /etc/profile; then
+    echo 'export PATH="/workspaces/github/vendor/node:/workspaces/github/vendor/node/bin:$PATH"' | sudo tee -a /etc/profile > /dev/null
+  fi
+  ```
 - **Feature flags: use `vexi_management`, not `add_override`.** `add_override` is per-process in-memory. `vexi_management.enable_feature_flag` persists to the backing store.
 - **Clean up temp initializers** when done: `rm config/initializers/z_temp_feature_flags.rb`
 - **`script/toggle-feature-flag` needs Ruby 3.x.** Codespace may have Ruby 2.7. Use `bin/rails runner` with `vexi_management` instead.
