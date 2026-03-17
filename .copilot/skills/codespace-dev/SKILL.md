@@ -72,6 +72,8 @@ gh cs ssh -c NAME -- "curl -s -o /dev/null -w '%{http_code}' http://github.local
 # Returns 200 when ready
 ```
 
+**Hot reload:** The server watches for file changes and rebuilds automatically. After editing files (Ruby, JS/TS, CSS), just refresh the browser — no server restart needed. The UI build (Vite/rspack) also hot-reloads frontend assets.
+
 Check server logs if something fails:
 
 ```bash
@@ -104,13 +106,13 @@ For the full tool list, see [references/chrome-mcp.md](references/chrome-mcp.md)
 
 ### 6. Iterate
 
-Edit files → server auto-reloads → refresh browser → verify. Repeat.
+Edit files → hot reload rebuilds automatically → refresh browser → verify. Repeat.
 
 ```bash
 # Edit
 gh cs ssh -c NAME -- "cd /workspaces/github && sed -i 's/old/new/' path/to/file.rb"
 
-# Refresh
+# Just refresh — no restart needed
 navigate_page(type="reload")
 
 # Check
