@@ -127,6 +127,60 @@ take_screenshot()
 - Health check: `http://github.localhost/status`
 - Process manager: Overmind (runs ~40 services from Procfile)
 
+## Surviving Interruptions
+
+The user may stop you mid-task. Design for resumption:
+
+1. **Use `nohup` and `&` for server commands.** The server runs inside the codespace, not locally. It survives local interruptions.
+2. **Port forwarding dies when your local shell dies.** Always restart it first:
+   ```bash
+   gh cs ports forward 80:8880 -c NAME
+   ```
+3. **Check state before acting.** On resumption:
+   ```bash
+   # Is the codespace running?
+   gh cs list -R github/github --json name,state
+   
+   # Is the server up?
+   gh cs ssh -c NAME -- "curl -s -o /dev/null -w '%{http_code}' http://github.localhost/status"
+   
+   # Is port forwarding alive?
+   curl -s -o /dev/null -w '%{http_code}' http://localhost:8880/status
+   ```
+4. **Re-establish port forwarding as async bash** (not detached — detached dies quickly for port forwards).
+5. **Feature flag initializers persist across restarts.** No need to re-add them.
+
+## Feature Flags
+
+Many features are behind Vexi feature flags. See the project skill at `.github/skills/feature-flags/SKILL.md` for full details.
+
+Quick version — to enable a flag in the codespace:
+
+```bash
+# Persistent — all processes see it (recommended)
+gh cs ssh -c NAME -- 'cd /workspaces/github && bin/rails runner "FeatureFlag.vexi_management.enable_feature_flag(\"flag_name\")"'
+```
+
+No server restart needed. The flag persists to the backing store and is visible to the web server immediately.
+
+To disable when done:
+
+```bash
+gh cs ssh -c NAME -- 'cd /workspaces/github && bin/rails runner "FeatureFlag.vexi_management.disable_feature_flag(\"flag_name\")"'
+```
+
+**Important:** `FeatureFlag.vexi.add_override` is per-process in-memory only. It does NOT affect the web server. Always use `vexi_management` instead.
+
+## Dev Login
+
+Default seed user: `monalisa`. Reset the password if needed:
+
+```bash
+gh cs ssh -c NAME -- 'cd /workspaces/github && bin/rails runner '"'"'u = User.find_by(login: "monalisa"); u.password = "password"; u.save(validate: false)'"'"''
+```
+
+Then sign in at `http://localhost:8880/login` with `monalisa` / `password`.
+
 ## Gotchas
 
 - **Branch is `master`**, not `main`
@@ -134,6 +188,9 @@ take_screenshot()
 - Server takes 1-3 min to boot. Poll `/status` before browsing
 - The app expects `github.localhost` as hostname. Port-forwarded `localhost:8880` works for most pages
 - For full hostname match, add `127.0.0.1 github.localhost` to local `/etc/hosts` and forward 80:80
+- **SSH PATH is wrong.** SSH sessions don't get devcontainer `remoteEnv`. Add node to PATH: `export PATH="/workspaces/github/vendor/node/bin:$PATH"`
+- **Feature flags: use `vexi_management`, not `add_override`.** `add_override` is per-process in-memory. `vexi_management.enable_feature_flag` persists to the backing store.
+- **Clean up temp initializers** when done: `rm config/initializers/z_temp_feature_flags.rb`
 
 ## References
 
