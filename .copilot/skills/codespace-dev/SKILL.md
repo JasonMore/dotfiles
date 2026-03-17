@@ -258,7 +258,11 @@ Chrome MCP can take screenshots of the local dev app. To add them to a PR descri
 - Server takes 1-3 min to boot. Poll `/status` before browsing
 - The app expects `github.localhost` as hostname. Port-forwarded `localhost:8880` works for most pages
 - For full hostname match, add `127.0.0.1 github.localhost` to local `/etc/hosts` and forward 80:80
-- **SSH PATH is wrong.** SSH sessions don't get devcontainer `remoteEnv`. Add node to PATH: `export PATH="/workspaces/github/vendor/node/bin:$PATH"`
+- **SSH PATH misses Node.** `gh cs ssh` doesn't load `remoteEnv` from devcontainer.json. System Node is v10; the codespace terminal gets v24 from `vendor/node/`. The correct Node lives at `/workspaces/github/vendor/node/` (symlinked to `node-v24.8.0-linux-x64/bin/`). Fix: prefix commands with the right PATH:
+  ```bash
+  gh cs ssh -c NAME -- 'export PATH="/workspaces/github/vendor/node:/workspaces/github/vendor/node/bin:$PATH" && node --version'
+  ```
+  **Root cause:** `.devcontainer/sshrc` adds Go to `/etc/profile` for SSH but skips Node. The `remoteEnv.PATH` in `devcontainer.json` includes `/workspaces/github/vendor/node` — but only for VS Code terminals, not SSH.
 - **Feature flags: use `vexi_management`, not `add_override`.** `add_override` is per-process in-memory. `vexi_management.enable_feature_flag` persists to the backing store.
 - **Clean up temp initializers** when done: `rm config/initializers/z_temp_feature_flags.rb`
 - **`script/toggle-feature-flag` needs Ruby 3.x.** Codespace may have Ruby 2.7. Use `bin/rails runner` with `vexi_management` instead.
