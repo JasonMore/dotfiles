@@ -206,6 +206,49 @@ evaluate_script(function: "() => { document.cookie = 'accessibilityScan=false; p
 
 Do this once after first login. The cookie lasts ~100 years.
 
+## Uploading Screenshots to PRs
+
+Chrome MCP can take screenshots of the local dev app. To add them to a PR description:
+
+1. **Save screenshots to files:**
+   ```
+   take_screenshot(filePath="/tmp/screenshot-collapsed.png")
+   take_screenshot(filePath="/tmp/screenshot-expanded.png")
+   ```
+
+2. **Compress (macOS `sips`):**
+   ```bash
+   sips -s format jpeg -s formatOptions 50 /tmp/screenshot-collapsed.png --out /tmp/screenshot-collapsed.jpg
+   ```
+
+3. **Upload to the PR branch via GitHub Contents API:**
+   ```bash
+   CONTENT=$(base64 -i /tmp/screenshot-collapsed.jpg)
+   gh api repos/OWNER/REPO/contents/.github/screenshots/collapsed.jpg \
+     --method PUT \
+     -f message="Add screenshot: collapsed state" \
+     -f branch="my-feature-branch" \
+     -f content="$CONTENT" \
+     --jq '.content.download_url'
+   ```
+
+4. **Reference in PR body:**
+   ```markdown
+   ![Collapsed](https://raw.githubusercontent.com/OWNER/REPO/BRANCH/.github/screenshots/collapsed.jpg)
+   ```
+
+5. **Update the PR description:**
+   ```bash
+   # Write body to a file first (heredocs break in zsh with HTML comments)
+   # Use the create_file tool to write /tmp/pr_body.md, then:
+   gh pr edit PR_NUMBER -R OWNER/REPO --body-file /tmp/pr_body.md
+   rm /tmp/pr_body.md
+   ```
+
+**Why not use GitHub's upload/policies API?** It requires a browser session cookie — a CLI token alone returns 422.
+
+**Why not navigate to github.com directly?** Chrome MCP hits the SSO/Okta login wall for internal repos. Use `gh` CLI for all github.com operations instead.
+
 ## Gotchas
 
 - **Branch is `master`**, not `main`
@@ -216,6 +259,9 @@ Do this once after first login. The cookie lasts ~100 years.
 - **SSH PATH is wrong.** SSH sessions don't get devcontainer `remoteEnv`. Add node to PATH: `export PATH="/workspaces/github/vendor/node/bin:$PATH"`
 - **Feature flags: use `vexi_management`, not `add_override`.** `add_override` is per-process in-memory. `vexi_management.enable_feature_flag` persists to the backing store.
 - **Clean up temp initializers** when done: `rm config/initializers/z_temp_feature_flags.rb`
+- **`script/toggle-feature-flag` needs Ruby 3.x.** Codespace may have Ruby 2.7. Use `bin/rails runner` with `vexi_management` instead.
+- **Chrome MCP only works on localhost.** Don't navigate to github.com — SSO blocks you. Use `gh` CLI for github.com API calls.
+- **Use `sips` for image compression on macOS.** PIL/Pillow not installed. `sips -s format jpeg -s formatOptions 50 in.png --out out.jpg`
 
 ## References
 
