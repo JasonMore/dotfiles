@@ -267,5 +267,7 @@ workspace() {
     fi
 }
 
-# Export the function
-export -f workspace
+# export -f is bash-only; zsh doesn't support it
+if [ -n "$BASH_VERSION" ]; then
+    export -f workspace
+fi
