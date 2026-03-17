@@ -173,13 +173,38 @@ gh cs ssh -c NAME -- 'cd /workspaces/github && bin/rails runner "FeatureFlag.vex
 
 ## Dev Login
 
-Default seed user: `monalisa`. Reset the password if needed:
+Default seed user: `monalisa`. Password is auto-filled on the login page.
+
+1. Navigate to `http://localhost:8880/login`
+2. Click **Sign in** — credentials are pre-filled
+3. If an OTP/2FA screen appears, the code is auto-filled — just click **Verify**
+4. Session persists across page navigations
+
+If the password isn't working, reset it:
 
 ```bash
 gh cs ssh -c NAME -- 'cd /workspaces/github && bin/rails runner '"'"'u = User.find_by(login: "monalisa"); u.password = "password"; u.save(validate: false)'"'"''
 ```
 
-Then sign in at `http://localhost:8880/login` with `monalisa` / `password`.
+## Disable Accessibility Scanner
+
+The dev app shows an accessibility scanner overlay that clutters Chrome MCP snapshots. Disable it by setting a cookie:
+
+```javascript
+// Via Chrome MCP evaluate_script
+() => {
+  const expires = new Date(Date.now() + 100 * 365 * 24 * 60 * 60 * 1000).toUTCString();
+  document.cookie = `accessibilityScan=false; path=/; expires=${expires}`;
+}
+```
+
+Or after navigating to a page:
+
+```
+evaluate_script(function: "() => { document.cookie = 'accessibilityScan=false; path=/; expires=' + new Date(Date.now() + 3.156e12).toUTCString(); }")
+```
+
+Do this once after first login. The cookie lasts ~100 years.
 
 ## Gotchas
 
