@@ -86,15 +86,9 @@ if [[ -n "${CODESPACES}" ]]; then
 		echo "[dotfiles] Warning: .copilot/copilot-instructions.md not found, skipping"
 	fi
 
-	# User agent skills (caveman etc.)
-	echo "[dotfiles] Setting up user agent skills"
-	if [[ -d "${DOTFILES_DIR}/.agents/skills" ]]; then
-		mkdir -p "${HOME}/.agents/skills"
-		cp -r "${DOTFILES_DIR}/.agents/skills/"* "${HOME}/.agents/skills/"
-		echo "[dotfiles] Copied user agent skills from ${DOTFILES_DIR}/.agents/skills/"
-	else
-		echo "[dotfiles] Warning: .agents/skills not found, skipping user agent skills setup"
-	fi
+	# User agent skills (caveman etc.) — installed fresh from source
+	echo "[dotfiles] Installing caveman skills"
+	"${DOTFILES_DIR}/install-caveman-skills"
 
 	# Install Copilot coder plugin
 	echo "[dotfiles] Installing Copilot coder plugin"
