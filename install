@@ -86,6 +86,16 @@ if [[ -n "${CODESPACES}" ]]; then
 		echo "[dotfiles] Warning: .copilot/copilot-instructions.md not found, skipping"
 	fi
 
+	# Copilot MCP config
+	echo "[dotfiles] Setting up Copilot MCP config"
+	if [[ -f "${DOTFILES_DIR}/.copilot/mcp-config.json" ]]; then
+		mkdir -p "${HOME}/.copilot"
+		cp "${DOTFILES_DIR}/.copilot/mcp-config.json" "${HOME}/.copilot/mcp-config.json"
+		echo "[dotfiles] Copied mcp-config.json"
+	else
+		echo "[dotfiles] Warning: .copilot/mcp-config.json not found, skipping"
+	fi
+
 	# User agent skills (caveman etc.) — installed fresh from source
 	echo "[dotfiles] Installing caveman skills"
 	"${DOTFILES_DIR}/install-caveman-skills"
