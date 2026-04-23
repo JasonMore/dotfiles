@@ -65,6 +65,14 @@ if [[ -n "${CODESPACES}" ]]; then
 	# Install agent skills
 	echo "[dotfiles] Installing agent skills"
 	"${DOTFILES_DIR}/install-agent-skills"
+
+	# gh-stack
+	echo "[dotfiles] Installing gh-stack extension"
+	gh extension install github/gh-stack
+	echo "[dotfiles] Adding gh-stack aliases"
+	gh stack alias
+	echo "[dotfiles] Adding gh-stack skill"
+	npx skills add github/gh-stack
   
 	# Copilot CLI skills
 	echo "[dotfiles] Setting up Copilot skills"
