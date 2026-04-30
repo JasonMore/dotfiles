@@ -37,6 +37,30 @@ if [[ -n "${CODESPACES}" ]]; then
 	echo "[dotfiles] Linking zsh config for Codespaces"
 	ln -sf "${DOTFILES_DIR}/.zshrc" "${HOME}/.zshrc"
 
+	# VS Code Ruby LSP config (machine-scoped in Codespaces)
+	VSCODE_SETTINGS_DIR="${HOME}/.vscode-remote/data/Machine"
+	VSCODE_SETTINGS_FILE="${VSCODE_SETTINGS_DIR}/settings.json"
+	echo "[dotfiles] Configuring VS Code machine settings for Ruby LSP"
+	mkdir -p "${VSCODE_SETTINGS_DIR}"
+	if [[ ! -f "${VSCODE_SETTINGS_FILE}" ]]; then
+		echo "{}" > "${VSCODE_SETTINGS_FILE}"
+	fi
+	if command -v jq >/dev/null 2>&1; then
+		tmp_settings="$(mktemp)"
+		if jq '. + {
+			"rubyLsp.rubyVersionManager.identifier": "custom",
+			"rubyLsp.customRubyCommand": "bin/safe-ruby"
+		}' "${VSCODE_SETTINGS_FILE}" > "${tmp_settings}"; then
+			mv "${tmp_settings}" "${VSCODE_SETTINGS_FILE}"
+			echo "[dotfiles] Updated ${VSCODE_SETTINGS_FILE} for Ruby LSP"
+		else
+			rm -f "${tmp_settings}"
+			echo "[dotfiles] Warning: ${VSCODE_SETTINGS_FILE} is not valid JSON; skipping Ruby LSP machine settings update"
+		fi
+	else
+		echo "[dotfiles] Warning: jq not found; skipping Ruby LSP machine settings update"
+	fi
+
 	# Atuin
 	if command -v atuin >/dev/null 2>&1; then
 		echo "[dotfiles] Atuin already installed"
