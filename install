@@ -86,6 +86,30 @@ if [[ -n "${CODESPACES}" ]]; then
 	echo "[dotfiles] Migrating legacy MCP configs"
 	migrate_codespaces_mcp_configs
 
+	# VS Code Ruby LSP config (machine-scoped in Codespaces)
+	VSCODE_SETTINGS_DIR="${HOME}/.vscode-remote/data/Machine"
+	VSCODE_SETTINGS_FILE="${VSCODE_SETTINGS_DIR}/settings.json"
+	echo "[dotfiles] Configuring VS Code machine settings for Ruby LSP"
+	mkdir -p "${VSCODE_SETTINGS_DIR}"
+	if [[ ! -f "${VSCODE_SETTINGS_FILE}" ]]; then
+		echo "{}" > "${VSCODE_SETTINGS_FILE}"
+	fi
+	if command -v jq >/dev/null 2>&1; then
+		tmp_settings="$(mktemp)"
+		if jq '. + {
+			"rubyLsp.rubyVersionManager.identifier": "custom",
+			"rubyLsp.customRubyCommand": "bin/safe-ruby"
+		}' "${VSCODE_SETTINGS_FILE}" > "${tmp_settings}"; then
+			mv "${tmp_settings}" "${VSCODE_SETTINGS_FILE}"
+			echo "[dotfiles] Updated ${VSCODE_SETTINGS_FILE} for Ruby LSP"
+		else
+			rm -f "${tmp_settings}"
+			echo "[dotfiles] Warning: ${VSCODE_SETTINGS_FILE} is not valid JSON; skipping Ruby LSP machine settings update"
+		fi
+	else
+		echo "[dotfiles] Warning: jq not found; skipping Ruby LSP machine settings update"
+	fi
+
 	# Atuin
 	if command -v atuin >/dev/null 2>&1; then
 		echo "[dotfiles] Atuin already installed"
@@ -111,19 +135,17 @@ if [[ -n "${CODESPACES}" ]]; then
 		echo "[dotfiles] Warning: ${DOTFILES_DIR}/.github/agents not found, skipping agent config setup"
 	fi
 
-	# Global Copilot instructions
-	echo "[dotfiles] Setting up global Copilot instructions"
-	if [[ -f "${DOTFILES_DIR}/.github/copilot-instructions.md" ]]; then
-		mkdir -p "${HOME}/.github"
-		cp "${DOTFILES_DIR}/.github/copilot-instructions.md" "${HOME}/.github/copilot-instructions.md"
-		echo "[dotfiles] Copied global Copilot instructions"
-	else
-		echo "[dotfiles] Warning: ${DOTFILES_DIR}/.github/copilot-instructions.md not found, skipping instructions setup"
-	fi
-
 	# Install agent skills
 	echo "[dotfiles] Installing agent skills"
 	"${DOTFILES_DIR}/install-agent-skills"
+
+	# gh-stack
+	echo "[dotfiles] Installing gh-stack extension"
+	gh extension install github/gh-stack
+	echo "[dotfiles] Adding gh-stack aliases"
+	gh stack alias
+	echo "[dotfiles] Adding gh-stack skill"
+	npx skills add github/gh-stack
   
 	# Copilot CLI skills
 	echo "[dotfiles] Setting up Copilot skills"
@@ -134,6 +156,30 @@ if [[ -n "${CODESPACES}" ]]; then
 	else
 		echo "[dotfiles] Warning: ${DOTFILES_DIR}/.copilot/skills not found, skipping skills setup"
 	fi
+
+	# Copilot instructions
+	echo "[dotfiles] Setting up Copilot instructions"
+	if [[ -f "${DOTFILES_DIR}/.copilot/copilot-instructions.md" ]]; then
+		mkdir -p "${HOME}/.copilot"
+		cp "${DOTFILES_DIR}/.copilot/copilot-instructions.md" "${HOME}/.copilot/copilot-instructions.md"
+		echo "[dotfiles] Copied copilot-instructions.md"
+	else
+		echo "[dotfiles] Warning: .copilot/copilot-instructions.md not found, skipping"
+	fi
+
+	# Copilot MCP config
+	echo "[dotfiles] Setting up Copilot MCP config"
+	if [[ -f "${DOTFILES_DIR}/.copilot/mcp-config.json" ]]; then
+		mkdir -p "${HOME}/.copilot"
+		cp "${DOTFILES_DIR}/.copilot/mcp-config.json" "${HOME}/.copilot/mcp-config.json"
+		echo "[dotfiles] Copied mcp-config.json"
+	else
+		echo "[dotfiles] Warning: .copilot/mcp-config.json not found, skipping"
+	fi
+
+	# User agent skills (caveman etc.) — installed fresh from source
+	echo "[dotfiles] Installing caveman skills"
+	"${DOTFILES_DIR}/install-caveman-skills"
 
 	# Install Copilot coder plugin
 	echo "[dotfiles] Installing Copilot coder plugin"
