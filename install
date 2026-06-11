@@ -14,6 +14,51 @@ echo "[dotfiles] Setting up global gitignore"
 DOTFILES_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 git config --global core.excludesfile "${DOTFILES_DIR}/.gitignore_global"
 
+migrate_legacy_mcp_config() {
+	local repo_path="$1"
+	local legacy_config="${repo_path}/.vscode/mcp.json"
+	local new_config="${repo_path}/.mcp.json"
+	local temp_config=""
+
+	if [[ ! -f "${legacy_config}" || -f "${new_config}" ]]; then
+		return 0
+	fi
+
+	if ! jq -e 'has("servers") and (.servers | type == "object")' "${legacy_config}" >/dev/null 2>&1; then
+		echo "[dotfiles] Warning: ${legacy_config} is missing a valid .servers object; skipping MCP migration"
+		return 0
+	fi
+
+	temp_config="$(mktemp)"
+	if jq '{mcpServers: .servers}' "${legacy_config}" > "${temp_config}"; then
+		mv "${temp_config}" "${new_config}"
+		echo "[dotfiles] Migrated ${legacy_config} -> ${new_config}"
+	else
+		rm -f "${temp_config}"
+		echo "[dotfiles] Warning: Failed to migrate ${legacy_config}"
+	fi
+}
+
+migrate_codespaces_mcp_configs() {
+	local legacy_config=""
+
+	if [[ ! -d "/workspaces" ]]; then
+		echo "[dotfiles] /workspaces not found; skipping MCP migration"
+		return 0
+	fi
+
+	if ! command -v jq >/dev/null 2>&1; then
+		echo "[dotfiles] Warning: jq not found; skipping MCP migration"
+		return 0
+	fi
+
+	while IFS= read -r legacy_config; do
+		migrate_legacy_mcp_config "${legacy_config%/.vscode/mcp.json}"
+	done < <(find /workspaces -type f -path "*/.vscode/mcp.json" 2>/dev/null)
+
+	echo "[dotfiles] MCP migration check complete"
+}
+
 # Tmux config
 echo "[dotfiles] Linking tmux config"
 ln -sf "${DOTFILES_DIR}/.tmux.conf" "${HOME}/.tmux.conf"
@@ -36,6 +81,10 @@ if [[ -n "${CODESPACES}" ]]; then
 	# zsh config
 	echo "[dotfiles] Linking zsh config for Codespaces"
 	ln -sf "${DOTFILES_DIR}/.zshrc" "${HOME}/.zshrc"
+
+	# Migrate legacy Copilot MCP config files to the current .mcp.json format
+	echo "[dotfiles] Migrating legacy MCP configs"
+	migrate_codespaces_mcp_configs
 
 	# Atuin
 	if command -v atuin >/dev/null 2>&1; then
@@ -60,6 +109,16 @@ if [[ -n "${CODESPACES}" ]]; then
 		echo "[dotfiles] Copied Copilot agent configuration"
 	else
 		echo "[dotfiles] Warning: ${DOTFILES_DIR}/.github/agents not found, skipping agent config setup"
+	fi
+
+	# Global Copilot instructions
+	echo "[dotfiles] Setting up global Copilot instructions"
+	if [[ -f "${DOTFILES_DIR}/.github/copilot-instructions.md" ]]; then
+		mkdir -p "${HOME}/.github"
+		cp "${DOTFILES_DIR}/.github/copilot-instructions.md" "${HOME}/.github/copilot-instructions.md"
+		echo "[dotfiles] Copied global Copilot instructions"
+	else
+		echo "[dotfiles] Warning: ${DOTFILES_DIR}/.github/copilot-instructions.md not found, skipping instructions setup"
 	fi
 
 	# Install agent skills

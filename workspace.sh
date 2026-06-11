@@ -11,6 +11,36 @@
 #   workspace --list                                       # List all workspaces
 #   workspace --delete <workspace-name>                    # Delete a workspace
 
+migrate_legacy_mcp_config() {
+    local repo_path="$1"
+    local legacy_config="${repo_path}/.vscode/mcp.json"
+    local new_config="${repo_path}/.mcp.json"
+    local temp_config=""
+
+    if [[ ! -f "${legacy_config}" || -f "${new_config}" ]]; then
+        return 0
+    fi
+
+    if ! command -v jq >/dev/null 2>&1; then
+        echo "Warning: jq not found; skipping MCP migration for ${repo_path}"
+        return 0
+    fi
+
+    if ! jq -e 'has("servers") and (.servers | type == "object")' "${legacy_config}" >/dev/null 2>&1; then
+        echo "Warning: ${legacy_config} is missing a valid .servers object; skipping MCP migration"
+        return 0
+    fi
+
+    temp_config="$(mktemp)"
+    if jq '{mcpServers: .servers}' "${legacy_config}" > "${temp_config}"; then
+        mv "${temp_config}" "${new_config}"
+        echo "Migrated MCP config: ${legacy_config} -> ${new_config}"
+    else
+        rm -f "${temp_config}"
+        echo "Warning: Failed to migrate ${legacy_config}"
+    fi
+}
+
 workspace() {
     # Handle flags
     if [ "$1" = "--list" ]; then
@@ -237,6 +267,7 @@ workspace() {
     if [ -d "$worktree_path" ]; then
         echo "Error: Worktree already exists at $worktree_path"
         echo "Opening existing worktree in VS Code..."
+        migrate_legacy_mcp_config "$worktree_path"
         code "$worktree_path"
         return 0
     fi
@@ -254,6 +285,8 @@ workspace() {
         echo "Error: Failed to create worktree"
         return 1
     fi
+
+    migrate_legacy_mcp_config "$worktree_path"
     
     # Open in new VS Code window
     echo "Opening VS Code in new window..."
