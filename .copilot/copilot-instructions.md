@@ -5,6 +5,9 @@
 - Default to caveman mode for all sessions.
 - Invoke the `caveman` skill at the start of each session and keep intensity at `full` unless the user asks for another mode.
 
+## Commenting on PRs and Issues
+- **REQUIRED:** Any time you comment as me on a PR or issue, prepend the message with `[from copilot-cli]`.
+
 ## Writing code
 - Use a focused coding subagent (sonnet) for non-trivial code changes, broad refactors, unfamiliar areas, or multi-file behavior changes.
 - Do not delegate trivial edits, mechanical fixes, docs-only changes, or changes that can be safely completed directly.
