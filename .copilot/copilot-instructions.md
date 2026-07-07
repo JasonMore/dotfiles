@@ -9,8 +9,10 @@
 - **REQUIRED:** Any time you comment as me on a PR or issue, prepend the message with `[from copilot-cli]`.
 
 ## Writing code
-- Use a focused coding subagent (sonnet) for non-trivial code changes, broad refactors, unfamiliar areas, or multi-file behavior changes.
+- Use a focused coding subagent for non-trivial code changes, broad refactors, unfamiliar areas, or multi-file behavior changes.
 - Do not delegate trivial edits, mechanical fixes, docs-only changes, or changes that can be safely completed directly.
+- **Model selection (use judgement).** For medium-to-large delegated tasks, prefer a lower-cost model to preserve the primary session's context window and budget. Escalate to a higher-cost model only when the work needs hard reasoning: tricky bugs, non-obvious architecture, ambiguous requirements, or changes spanning multiple systems.
+- **Reuse subagents for continuation.** When follow-up work continues in the same context (iterating on the same task, files, or the subagent's prior output), send the follow-up to the existing subagent instead of spawning a new one. This keeps its accumulated context warm and keeps bulk work out of the primary session, protecting the primary context window. Start a fresh subagent only when the context genuinely differs.
 - When delegating, give the subagent exact goal, scope, constraints, relevant files, expected behavior, and validation plan.
 - The coding subagent must self-validate before returning: run tsc, lint, and relevant tests. Do not return code that fails deterministic checks.
 - The main agent must review the subagent's diff before finalizing.

@@ -2,7 +2,10 @@
 
 set -euo pipefail
 
-sudo chsh "$(id -un)" --shell "/usr/bin/zsh"
+# Codespaces uses zsh at /usr/bin/zsh; skip on local (e.g. macOS) where that path/chsh differs
+if [[ -n "${CODESPACES:-}" ]]; then
+	sudo chsh "$(id -un)" --shell "/usr/bin/zsh"
+fi
 
 # Configure git so that 'git push' will automatically set up the remote tracking branch
 echo "[dotfiles] Setting git config: push.autoSetupRemote = true"
@@ -68,7 +71,25 @@ echo "[dotfiles] Installing workspace script"
 mkdir -p "${HOME}/.local/bin"
 ln -sf "${DOTFILES_DIR}/workspace.sh" "${HOME}/.local/bin/workspace.sh"
 
-if [[ -n "${CODESPACES}" ]]; then
+# Copilot instructions + MCP config
+# Symlinked (not copied) so the dotfiles repo stays the source of truth and
+# local + Codespaces always reflect the latest repo contents. Runs in both envs.
+echo "[dotfiles] Linking Copilot instructions and MCP config"
+mkdir -p "${HOME}/.copilot"
+if [[ -f "${DOTFILES_DIR}/.copilot/copilot-instructions.md" ]]; then
+	ln -sf "${DOTFILES_DIR}/.copilot/copilot-instructions.md" "${HOME}/.copilot/copilot-instructions.md"
+	echo "[dotfiles] Linked copilot-instructions.md"
+else
+	echo "[dotfiles] Warning: .copilot/copilot-instructions.md not found, skipping"
+fi
+if [[ -f "${DOTFILES_DIR}/.copilot/mcp-config.json" ]]; then
+	ln -sf "${DOTFILES_DIR}/.copilot/mcp-config.json" "${HOME}/.copilot/mcp-config.json"
+	echo "[dotfiles] Linked mcp-config.json"
+else
+	echo "[dotfiles] Warning: .copilot/mcp-config.json not found, skipping"
+fi
+
+if [[ -n "${CODESPACES:-}" ]]; then
 
 	# oh-my-zsh (shell framework)
 	if [[ -d "${HOME}/.oh-my-zsh" ]]; then
@@ -155,26 +176,6 @@ if [[ -n "${CODESPACES}" ]]; then
 		echo "[dotfiles] Copied Copilot skills from ${DOTFILES_DIR}/.copilot/skills/"
 	else
 		echo "[dotfiles] Warning: ${DOTFILES_DIR}/.copilot/skills not found, skipping skills setup"
-	fi
-
-	# Copilot instructions
-	echo "[dotfiles] Setting up Copilot instructions"
-	if [[ -f "${DOTFILES_DIR}/.copilot/copilot-instructions.md" ]]; then
-		mkdir -p "${HOME}/.copilot"
-		cp "${DOTFILES_DIR}/.copilot/copilot-instructions.md" "${HOME}/.copilot/copilot-instructions.md"
-		echo "[dotfiles] Copied copilot-instructions.md"
-	else
-		echo "[dotfiles] Warning: .copilot/copilot-instructions.md not found, skipping"
-	fi
-
-	# Copilot MCP config
-	echo "[dotfiles] Setting up Copilot MCP config"
-	if [[ -f "${DOTFILES_DIR}/.copilot/mcp-config.json" ]]; then
-		mkdir -p "${HOME}/.copilot"
-		cp "${DOTFILES_DIR}/.copilot/mcp-config.json" "${HOME}/.copilot/mcp-config.json"
-		echo "[dotfiles] Copied mcp-config.json"
-	else
-		echo "[dotfiles] Warning: .copilot/mcp-config.json not found, skipping"
 	fi
 
 	# User agent skills (caveman etc.) — installed fresh from source
