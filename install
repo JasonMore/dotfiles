@@ -89,6 +89,19 @@ else
 	echo "[dotfiles] Warning: .copilot/mcp-config.json not found, skipping"
 fi
 
+# copilot-notify daemon (macOS only, not Codespaces; uses osascript + launchctl)
+if [[ "$(uname)" == "Darwin" && -z "${CODESPACES:-}" ]]; then
+	echo "[dotfiles] Installing copilot-notify daemon"
+	mkdir -p "${HOME}/.copilot/bin"
+	ln -sf "${DOTFILES_DIR}/.copilot/bin/copilot-notify.sh" "${HOME}/.copilot/bin/copilot-notify.sh"
+	mkdir -p "${HOME}/Library/LaunchAgents"
+	PLIST_DEST="${HOME}/Library/LaunchAgents/com.jasonmore.copilot-notify.plist"
+	sed "s|__HOME__|${HOME}|g" "${DOTFILES_DIR}/.copilot/launchagents/com.jasonmore.copilot-notify.plist" > "${PLIST_DEST}"
+	launchctl unload "${PLIST_DEST}" 2>/dev/null || true
+	launchctl load "${PLIST_DEST}"
+	echo "[dotfiles] copilot-notify daemon installed and loaded"
+fi
+
 if [[ -n "${CODESPACES:-}" ]]; then
 
 	# oh-my-zsh (shell framework)
