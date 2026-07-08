@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.jasonmore.copilot-notify</string>
+
+    <!-- Loop mode: the script sleeps INTERVAL between polls internally, which
+         avoids launchd's ~10s respawn throttle. KeepAlive restarts it if it
+         ever exits (crash, logout/login). -->
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/bash</string>
+        <string>__HOME__/.copilot/bin/copilot-notify.sh</string>
+        <string>--loop</string>
+    </array>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+        <key>INCLUDE_CODESPACES</key>
+        <string>1</string>
+        <key>INTERVAL</key>
+        <string>2</string>
+        <key>CS_INTERVAL</key>
+        <string>30</string>
+    </dict>
+
+    <key>KeepAlive</key>
+    <true/>
+    <key>RunAtLoad</key>
+    <true/>
+
+    <key>StandardOutPath</key>
+    <string>__HOME__/.copilot/notify.log</string>
+    <key>StandardErrorPath</key>
+    <string>__HOME__/.copilot/notify.log</string>
+</dict>
+</plist>
