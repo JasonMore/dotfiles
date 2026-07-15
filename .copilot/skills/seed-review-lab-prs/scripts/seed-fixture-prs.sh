@@ -1,7 +1,12 @@
 #!/usr/bin/env bash
 #
-# seed-fixture-prs.sh — seed small/medium/large synthetic PRs into a review lab's
-# seed repo so a PR render/perf path (e.g. diff_entries) can be profiled.
+# seed-fixture-prs.sh — seed small/medium/large synthetic PRs into a PROXIMA
+# review lab's seed repo so a PR render/perf path (e.g. diff_entries) can be
+# profiled.
+#
+# PROXIMA ONLY. This targets throwaway proxima labs (*.octoca.ts.net) that hold
+# synthetic data. Do NOT run it against a normal review-lab.github.com lab —
+# those carry real production data. The script refuses any non-proxima host.
 #
 # Usage:
 #   seed-fixture-prs.sh <lab-host> [owner/repo] [scenario]
@@ -37,7 +42,14 @@ GIT() { env -u GH_TOKEN -u GITHUB_TOKEN -u GH_HOST git "$@"; }
 say() { printf '\n\033[1m==> %s\033[0m\n' "$*" >&2; }
 die() { printf '\n\033[1;31merror:\033[0m %s\n' "$*" >&2; exit 1; }
 
-# --- 0. prerequisites ------------------------------------------------------
+# --- 0. proxima guard: refuse non-proxima hosts (they hold real prod data) ---
+case "$LAB" in
+  *.octoca.ts.net) ;;
+  *) die "refusing to seed '$LAB': this skill is proxima-only (*.octoca.ts.net).
+  Normal review-lab.github.com labs carry real production data — do not seed them." ;;
+esac
+
+# --- 0b. prerequisites -----------------------------------------------------
 for cmd in gh git; do
   command -v "$cmd" >/dev/null 2>&1 || die "missing required command: $cmd"
 done

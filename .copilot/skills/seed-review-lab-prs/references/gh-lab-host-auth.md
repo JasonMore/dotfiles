@@ -79,13 +79,14 @@ different things:
   on their own: the page loads 200 while `diff_entries` returns 401. Re-login in that
   browser when that happens.
 
-## Tailnet + ephemerality
+## Proxima only (Tailnet + ephemerality)
 
-- proxima labs: `*.octoca.ts.net`, corp Tailnet only. `review-lab` labs:
-  `*.review-lab.github.com`.
-- proxima TTL ~48h, review-lab ~4h. When the lab is recreated it gets a fresh DB — the
-  seeded PRs are gone and you re-run `seed-fixture-prs.sh` against the new host. A plain
-  branch *redeploy* keeps the DB (and the PRs); only lab recreation wipes them.
+- This skill targets **proxima** labs (`*.octoca.ts.net`, corp Tailnet only, TTL ~48h).
+  The script refuses any other host. Normal `review-lab.github.com` labs carry real
+  production data — never seed fixture PRs into them.
+- When the proxima lab is recreated it gets a fresh DB — the seeded PRs are gone and you
+  re-run `seed-fixture-prs.sh` against the new host. A plain branch *redeploy* keeps the DB
+  (and the PRs); only lab recreation wipes them.
 
 ## Seed repo + base branch
 

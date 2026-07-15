@@ -1,23 +1,33 @@
 ---
 name: seed-review-lab-prs
-description: Seed synthetic small/medium/large PRs into a running GitHub review lab (proxima or review-lab.github.com) with gh/git against the lab host, then print page_data endpoint URLs for PR render/perf profiling. Use when the user wants test PRs of controlled diff sizes inside a lab to benchmark a page path. Pairs with deploy-review-lab.
+description: Seed synthetic small/medium/large PRs into a running **proxima** review lab (*.octoca.ts.net) with gh/git against the lab host, then print page_data endpoint URLs for PR render/perf profiling. Use when the user wants test PRs of controlled diff sizes inside a proxima lab to benchmark a page path. Proxima only — never seed a normal review-lab (it carries real prod data). Pairs with deploy-review-lab.
 ---
 
-# Seed test PRs into a review lab (for PR render / perf testing)
+# Seed test PRs into a proxima review lab (for PR render / perf testing)
 
-A review lab is a full, throwaway github.com clone running your branch. To
-benchmark a PR page path (e.g. the diff `page_data` XHR) you need **real PRs with
-controlled diff sizes inside the lab**. This skill creates them with the `gh` CLI
-pointed at the **lab host**, then hands you the endpoint URLs to profile.
+A proxima review lab is a full, throwaway github.com clone running your branch on
+the corp Tailnet. To benchmark a PR page path (e.g. the diff `page_data` XHR) you
+need **real PRs with controlled diff sizes inside the lab**. This skill creates
+them with the `gh` CLI pointed at the **lab host**, then hands you the endpoint
+URLs to profile.
 
 It does not deploy the lab — use `deploy-review-lab` for that first. Run this
 after the lab is live.
 
+## Proxima labs only — never seed a normal review-lab
+
+This skill is for **proxima** labs (`*.octoca.ts.net`) — private, throwaway
+clones with synthetic data that are safe to write junk PRs into.
+
+**Do not** point it at a normal `review-lab.github.com` lab. Those carry **real
+production data**, so seeding fixture PRs there is unsafe. If the host is not
+`*.octoca.ts.net`, stop.
+
 ## When to use this skill
 
-- "Seed the lab with small/medium/large PRs so I can profile diff rendering."
-- "I need fixture PRs in the review lab to A/B a cache."
-- "Push test data into the lab for the `diff_entries` benchmark."
+- "Seed the proxima lab with small/medium/large PRs so I can profile diff rendering."
+- "I need fixture PRs in the proxima lab to A/B a cache."
+- "Push test data into the proxima lab for the `diff_entries` benchmark."
 
 ## Before you start: two things a CLI agent cannot do itself
 
@@ -43,15 +53,17 @@ LAB=<host from the .deploy "done!" URL>
 GH="env -u GH_TOKEN -u GITHUB_TOKEN -u GH_HOST gh"
 ```
 
-## Know your lab type
+## Lab facts
 
-| type | host shape | network | TTL |
-|------|------------|---------|-----|
-| proxima | `proxima-review-lab-<owner>-<branch>.octoca.ts.net` | corp Tailnet (Tailscale) | ~48h |
-| review-lab | `*.review-lab.github.com` | normal network | ~4h |
+Proxima labs are on the corp **Tailnet**, so you must be on Tailscale to reach
+them:
 
-Both are ephemeral: when the lab is **recreated** its DB resets and the seeded
-PRs are gone — re-seed. A plain branch **redeploy** keeps the DB and the PRs.
+| host shape | network | TTL |
+|------------|---------|-----|
+| `proxima-review-lab-<owner>-<branch>.octoca.ts.net` | corp Tailnet (Tailscale) | ~48h |
+
+The lab is ephemeral: when it is **recreated** its DB resets and the seeded PRs
+are gone — re-seed. A plain branch **redeploy** keeps the DB and the PRs.
 
 ## Fast path
 
