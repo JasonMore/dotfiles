@@ -44,20 +44,23 @@ BODY_MAX="${BODY_MAX:-100}"
 CS_INTERVAL="${CS_INTERVAL:-30}"
 CS_SNAP="$STATE_DIR/notify-codespace-snapshot.tsv"   # name<TAB>session_id<TAB>last_turn
 
-# --- Local desktop-app sessions -------------------------------------------
-# The app stores session state in a SQLite db; a session's agent finishing a
-# turn flips is_running 1 -> 0 ("your move"). We watch that transition.
+# --- Local terminal Copilot CLI sessions -----------------------------------
+# The GitHub Copilot DESKTOP APP already fires its own notifications for the
+# sessions you start in it, so we deliberately DO NOT ping those. Instead we
+# watch local *terminal* `copilot` CLI sessions, which the app never notifies
+# about. Their state lives in ~/.copilot/session-store.db (same schema the
+# codespace poller reads remotely); a finished turn = a new non-empty
+# assistant_response. App sessions are separated out by cwd: the app runs its
+# sessions under $HOME/.copilot/ (copilot-worktrees/ and chats/), terminal CLI
+# sessions run in real repo dirs. Detection is turn-based (is_running is NOT
+# maintained for CLI sessions), mirroring poll_codespaces but against the local db.
 MONITOR_LOCAL="${MONITOR_LOCAL:-1}"
-LOCAL_DB="${LOCAL_DB:-$STATE_DIR/data.db}"
-# State file cols: id<TAB>running<TAB>zero_streak<TAB>notified<TAB>title<TAB>location
-LOCAL_SNAP="$STATE_DIR/notify-local-snapshot.tsv"
-# Consecutive not-running polls required before a "finished" ping. Debounces
-# is_running blips between turns so one real finish = one notification.
-LOCAL_DEBOUNCE="${LOCAL_DEBOUNCE:-2}"
-# Which session_type values to notify about (comma list). Excludes automated
-# 'workflow_workspace' (scheduled workflows) by default. Add 'general_chat' to
-# also get pinged when chat sessions finish.
-LOCAL_TYPES="${LOCAL_TYPES:-project}"
+# cwd prefix that marks an app-managed (not terminal-CLI) session; excluded.
+LOCAL_EXCLUDE_PREFIX="${LOCAL_EXCLUDE_PREFIX:-$HOME/.copilot/}"
+# Only consider sessions touched within this window (bounds the query + snapshot).
+LOCAL_MAX_AGE="${LOCAL_MAX_AGE:-2 days}"
+# State file cols: session_id<TAB>last_turn
+LOCAL_SNAP="$STATE_DIR/notify-local-turns.tsv"
 
 DRY_RUN=0; LOOP=0
 for arg in "$@"; do
@@ -116,21 +119,7 @@ dir_tail() {
   fi
 }
 
-# Latest non-empty assistant_response for a local session id (Line 2 text).
-local_last_response() {
-  local id="$1"
-  [ -f "$SESSION_STORE_DB" ] || return 0
-  sqlite3 -noheader "file:$SESSION_STORE_DB?mode=ro" "
-    SELECT replace(replace(assistant_response,char(10),' '),char(13),' ')
-    FROM turns
-    WHERE session_id='$id'
-      AND assistant_response IS NOT NULL
-      AND trim(assistant_response) <> ''
-    ORDER BY turn_index DESC LIMIT 1;
-  " 2>/dev/null
-}
-
-# Current task snapshot: id<TAB>state<TAB>shortname
+# Current task snapshot: id<TAB>state<TAB>shortname<TAB>repo<TAB>pr<TAB>prstate
 snapshot_tasks() {
   gh_k agent-task list --limit 100 \
     --json id,name,state,pullRequestNumber,pullRequestState,repository \
@@ -138,85 +127,66 @@ snapshot_tasks() {
     2>/dev/null
 }
 
-# Build the local sessions snapshot: id<TAB>is_running<TAB>title<TAB>path<TAB>repo
-# path = worktree/source path (for Line 1 dir tail); repo = owner/repo fallback.
+# Snapshot of local terminal-CLI sessions with their latest COMPLETED turn.
+# Emits: session_id<TAB>turn_index<TAB>cwd<TAB>response  (one row per active CLI
+# session). App-managed sessions (cwd under $LOCAL_EXCLUDE_PREFIX) are excluded,
+# as are those with no cwd. Only sessions updated within $LOCAL_MAX_AGE count.
 snapshot_local() {
-  [ -f "$LOCAL_DB" ] || return 0
-  local types_sql
-  types_sql="'$(printf '%s' "$LOCAL_TYPES" | sed "s/,/','/g")'"
-  sqlite3 -noheader -separator $'\t' "file:$LOCAL_DB?mode=ro" "
+  [ -f "$SESSION_STORE_DB" ] || return 0
+  local esc
+  esc="$(printf '%s' "$LOCAL_EXCLUDE_PREFIX" | sed "s/'/''/g")"
+  sqlite3 -noheader -separator $'\t' "file:$SESSION_STORE_DB?mode=ro" "
     SELECT s.id,
-           s.is_running,
-           replace(substr(coalesce(s.title,'untitled'),1,70), char(10),' '),
-           coalesce(wt.path, w.source_path, ''),
-           CASE
-             WHEN s.execution_location != 'local'
-               THEN trim(s.execution_location || ' ' || coalesce(s.remote_connect_target,''))
-             WHEN p.github_owner IS NOT NULL
-               THEN p.github_owner || '/' || p.github_repo
-             ELSE ''
-           END
+           t.turn_index,
+           s.cwd,
+           substr(replace(replace(t.assistant_response,char(10),' '),char(13),' '),1,$BODY_MAX)
     FROM sessions s
-    LEFT JOIN workspaces w ON w.session_id = s.id
-    LEFT JOIN projects   p ON p.id = w.project_id
-    LEFT JOIN worktrees wt ON wt.id = w.worktree_id
-    WHERE s.archived_at IS NULL
-      AND s.session_type IN ($types_sql);
+    JOIN turns t ON t.session_id = s.id
+    WHERE s.updated_at > datetime('now','-$LOCAL_MAX_AGE')
+      AND s.cwd IS NOT NULL AND trim(s.cwd) <> ''
+      AND s.cwd NOT LIKE '${esc}%'
+      AND t.assistant_response IS NOT NULL AND trim(t.assistant_response) <> ''
+      AND t.turn_index = (SELECT MAX(t2.turn_index) FROM turns t2
+                          WHERE t2.session_id = s.id
+                            AND t2.assistant_response IS NOT NULL
+                            AND trim(t2.assistant_response) <> '');
   " 2>/dev/null
 }
 
-# Watch local sessions and notify ONCE when one settles into not-running.
-# Per-session state machine (persisted in $LOCAL_SNAP):
-#   running=1            -> re-arm (zero_streak=0, notified=0)
-#   running=0            -> zero_streak++
-#   zero_streak>=DEBOUNCE and not yet notified -> fire once, set notified=1
-# This debounces is_running flapping between turns and guarantees a single ping
-# per finish; a session that runs again later re-arms and can ping again.
+# Watch local terminal-CLI sessions; notify ONCE per newly-completed turn.
+# Turn-based (is_running is not maintained for CLI sessions), mirroring
+# poll_codespaces but against the local session-store.db. State ($LOCAL_SNAP):
+# session_id<TAB>last_turn. Global seed suppression: on the daemon's very first
+# run (snapshot file empty) record every session's current max turn WITHOUT
+# notifying, to avoid a startup flood from the historical backlog. After that a
+# brand-new session (no prior row -> pturn=-1) fires on its first completed turn,
+# and any session fires whenever its turn_index advances.
 poll_local() {
   [ "$MONITOR_LOCAL" = "1" ] || return 0
   command -v sqlite3 >/dev/null 2>&1 || return 0
   local cur pinged=0 seeding=0 out=""
-  cur="$(snapshot_local)"           # id<TAB>running<TAB>title<TAB>path<TAB>repo
-  [ -z "$cur" ] && return 0
   [ ! -s "$LOCAL_SNAP" ] && seeding=1
+  cur="$(snapshot_local)"           # id<TAB>turn<TAB>cwd<TAB>response
+  [ -z "$cur" ] && return 0
 
-  while IFS=$'\t' read -r id running title path repo; do
+  while IFS=$'\t' read -r id turn cwd resp; do
     [ -z "${id:-}" ] && continue
-
-    # Line 1 dir: last 2 segments of the worktree path, else repo, else '?'.
-    local dir
-    dir="$(dir_tail "$path")"
-    [ -z "$dir" ] && dir="${repo:-?}"
-    local loc="local : $dir"
+    [ -z "${turn:-}" ] && continue
 
     if [ "$DRY_RUN" = "1" ]; then
-      printf 'local  running=%s  [%s]  %s\n' "$running" "$loc" "$title"
+      printf 'local  [local : %s]  turn=%s  %s\n' "$(dir_tail "$cwd")" "$turn" "$resp"
       continue
     fi
 
-    # Prior state for this id
-    local prior pzero pnotified
+    local prior pturn
     prior="$(grep -F "$id"$'\t' "$LOCAL_SNAP" 2>/dev/null | head -1)"
-    pzero="$(printf '%s' "$prior" | cut -f3)";     [ -z "$pzero" ] && pzero=0
-    pnotified="$(printf '%s' "$prior" | cut -f4)"; [ -z "$pnotified" ] && pnotified=0
+    pturn="$(printf '%s' "$prior" | cut -f2)"; [ -z "$pturn" ] && pturn=-1
 
-    local zero="$pzero" notified="$pnotified"
-    if [ "$running" = "1" ]; then
-      zero=0; notified=0                       # re-arm while working
-    elif [ "$seeding" = "1" ]; then
-      zero="$LOCAL_DEBOUNCE"; notified=1        # already idle at startup: suppress
-    else
-      zero=$((pzero + 1))
-      if [ "$zero" -ge "$LOCAL_DEBOUNCE" ] && [ "$notified" = "0" ]; then
-        local body
-        body="$(local_last_response "$id")"
-        [ -z "$body" ] && body="$title"
-        notify "$loc" "$(body_trunc "$body")"
-        notified=1; pinged=$((pinged + 1))
-      fi
+    if [ "$seeding" != "1" ] && [ "$turn" -gt "$pturn" ] 2>/dev/null; then
+      notify "local : $(dir_tail "$cwd")" "$(body_trunc "$resp")"
+      pinged=$((pinged + 1))
     fi
-
-    out="${out}${id}	${running}	${zero}	${notified}	${title}	${loc}
+    out="${out}${id}	${turn}
 "
   done <<< "$cur"
 
