@@ -1,30 +1,42 @@
 # seed-review-lab-prs
 
-Seed synthetic small/medium/large test PRs into a running review lab's `test/rails` repo,
-using the `gh` CLI pointed at the **lab host**, so a PR render/perf path (e.g. the
-`diff_entries` page_data XHR) can be profiled over real HTTP.
+Seed synthetic small/medium/large test PRs into a running review lab's seed repo
+(default `test/rails`), using the `gh` CLI pointed at the **lab host**, so a PR
+render/perf path (e.g. the `diff_entries` page_data XHR) can be profiled over real
+HTTP.
 
-Complements `deploy-review-lab`: that skill *deploys* a lab; this one *seeds test data into*
-a lab that's already up.
+Works for both proxima labs (`*.octoca.ts.net`, Tailscale) and
+`review-lab.github.com` labs. Complements `deploy-review-lab`: that skill *deploys*
+a lab; this one *seeds test data into* a lab that's already up.
 
 ## Quick start
 
 ```bash
-# after the lab is deployed and you're on Tailscale:
-scripts/seed-fixture-prs.sh proxima-review-lab-<owner>-<branch>.octoca.ts.net
+# after the lab is deployed and (for proxima) you're on Tailscale + authed:
+scripts/seed-fixture-prs.sh <lab-host> [owner/repo] [scenario]
 ```
 
-Prints the created PR numbers and a ready `curl` for each PR's `diff_entries` endpoint.
+- `owner/repo` — seed repo in the lab (default `test/rails`).
+- `scenario` — slug for branch names, PR titles, and fixture paths (default
+  `fixture`). Set it per investigation (e.g. `diff-lines-cache`).
+
+Prints the created PR numbers and a template `curl` for each PR's endpoint. The
+script **fails closed**: a failed push or PR-create stops the run instead of
+printing a URL for a PR that was never created.
 
 ## Files
 
-- `SKILL.md` — when to use, the 9-step flow, gotchas, how to drive the endpoint.
-- `scripts/seed-fixture-prs.sh` — auth-check → clone → generate 3 sizes → push → open 3
-  PRs → print URLs. Takes `<lab-host> [seed-repo]`.
-- `references/gh-lab-host-auth.md` — per-host auth, the `env -u GH_TOKEN -u GH_HOST` rule,
-  the write probe, Tailnet + ephemerality detail.
+- `SKILL.md` — when to use, the manual flow, gotchas, how to drive the endpoint.
+- `scripts/seed-fixture-prs.sh` — auth-check → resolve base branch → clone →
+  generate 3 sizes → push unique branches → open 3 PRs → print URLs. Takes
+  `<lab-host> [owner/repo] [scenario]`.
+- `references/gh-lab-host-auth.md` — per-host auth, the
+  `env -u GH_TOKEN -u GITHUB_TOKEN -u GH_HOST` rule, the write probe, the
+  browser-vs-CLI session split, Tailnet + ephemerality detail.
 
 ## Requires
 
-`gh`, `git`, `node`; Tailscale for proxima labs; an authenticated lab-host login
-(`gh auth login --hostname <lab> --web`).
+`gh`, `git`; Tailscale for proxima labs; an authenticated lab-host login. The
+interactive `gh auth login --web` and Tailscale connection are the **user's** job
+— a CLI agent can't do them and the script stops with the exact command to hand
+over.
