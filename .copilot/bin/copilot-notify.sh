@@ -32,6 +32,14 @@ STATE_DIR="${STATE_DIR:-$HOME/.copilot}"
 SNAP_FILE="$STATE_DIR/notify-snapshot.tsv"      # id<TAB>state<TAB>name
 INCLUDE_CODESPACES="${INCLUDE_CODESPACES:-1}"
 
+# --- Cloud coding-agent tasks ----------------------------------------------
+# poll_once watches `gh agent-task list` (cloud/remote coding-agent tasks). The
+# GitHub Copilot DESKTOP APP already fires its own notifications for ALL of your
+# cloud tasks regardless of where they were started, so these are redundant and
+# OFF by default. Set MONITOR_CLOUD=1 to re-enable (e.g. on a machine without the
+# app installed).
+MONITOR_CLOUD="${MONITOR_CLOUD:-0}"
+
 # Source of an agent's last response text (Line 2 of every notification).
 SESSION_STORE_DB="${SESSION_STORE_DB:-$STATE_DIR/session-store.db}"
 # Max chars of the response shown on Line 2.
@@ -196,6 +204,7 @@ poll_local() {
 }
 
 poll_once() {
+  [ "$MONITOR_CLOUD" = "1" ] || return 0
   local cur pinged=0
   cur="$(snapshot_tasks)"
   [ -z "$cur" ] && { echo "$(date '+%H:%M:%S')  no tasks / auth issue"; return; }
