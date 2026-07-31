@@ -4,9 +4,9 @@
 
 - Default to caveman mode for all sessions.
 - Invoke the `caveman` skill at the start of each session and keep intensity at `full` unless the user asks for another mode.
-- Create and update personal skills under this repository's `.copilot/skills/` directory. Treat the repository copy as the source of truth.
-- Symlink each repository-owned skill into `~/.copilot/skills/`. Do not leave the only copy in a session, worktree, or user config directory.
-- Before finishing skill work, validate the skill, commit its source and related installer or instruction changes, and push the branch to GitHub.
+- Create and update personal skills in `JasonMore/ai-skills` under its `skills/` directory. Treat that repository as the source of truth.
+- Run `JasonMore/ai-skills`'s installer to symlink each personal skill into `~/.copilot/skills/`. Do not leave the only copy in a session, worktree, dotfiles, or user config directory.
+- Before finishing skill work, validate the skill, commit it in `JasonMore/ai-skills`, and push it to GitHub.
 
 ## Commenting on PRs and Issues
 - **REQUIRED:** Any time you comment as me on a PR or issue, prepend the message with `[from copilot-cli]`.
