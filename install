@@ -89,6 +89,29 @@ else
 	echo "[dotfiles] Warning: .copilot/mcp-config.json not found, skipping"
 fi
 
+link_repository_copilot_skills() {
+	# Link per skill so this repository stays the source of truth without
+	# replacing skills installed from other sources.
+	echo "[dotfiles] Linking repository-owned Copilot skills"
+	if [[ -d "${DOTFILES_DIR}/.copilot/skills" ]]; then
+		mkdir -p "${HOME}/.copilot/skills"
+		for skill_dir in "${DOTFILES_DIR}/.copilot/skills/"*/; do
+			[[ -d "${skill_dir}" ]] || continue
+			skill_name="$(basename "${skill_dir}")"
+			skill_target="${HOME}/.copilot/skills/${skill_name}"
+			rm -rf -- "${skill_target}"
+			ln -s "${skill_dir%/}" "${skill_target}"
+			echo "[dotfiles] Linked skill: ${skill_name}"
+		done
+	else
+		echo "[dotfiles] Warning: ${DOTFILES_DIR}/.copilot/skills not found, skipping skills setup"
+	fi
+}
+
+if [[ -z "${CODESPACES:-}" ]]; then
+	link_repository_copilot_skills
+fi
+
 # copilot-notify daemon (macOS only, not Codespaces; uses osascript + launchctl)
 if [[ "$(uname)" == "Darwin" && -z "${CODESPACES:-}" ]]; then
 	echo "[dotfiles] Installing copilot-notify daemon"
@@ -181,16 +204,6 @@ if [[ -n "${CODESPACES:-}" ]]; then
 	echo "[dotfiles] Adding gh-stack skill"
 	npx skills add github/gh-stack
   
-	# Copilot CLI skills
-	echo "[dotfiles] Setting up Copilot skills"
-	if [[ -d "${DOTFILES_DIR}/.copilot/skills" ]]; then
-		mkdir -p "${HOME}/.copilot/skills"
-		cp -r "${DOTFILES_DIR}/.copilot/skills/"* "${HOME}/.copilot/skills/"
-		echo "[dotfiles] Copied Copilot skills from ${DOTFILES_DIR}/.copilot/skills/"
-	else
-		echo "[dotfiles] Warning: ${DOTFILES_DIR}/.copilot/skills not found, skipping skills setup"
-	fi
-
 	# User agent skills (caveman etc.) — installed fresh from source
 	echo "[dotfiles] Installing caveman skills"
 	"${DOTFILES_DIR}/install-caveman-skills"
@@ -198,4 +211,7 @@ if [[ -n "${CODESPACES:-}" ]]; then
 	# Install Copilot coder plugin
 	echo "[dotfiles] Installing Copilot coder plugin"
 	"${DOTFILES_DIR}/install-copilot-plugin"
+
+	# Link repository skills last so external installers cannot overwrite them.
+	link_repository_copilot_skills
 fi
