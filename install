@@ -202,7 +202,15 @@ if [[ -n "${CODESPACES:-}" ]]; then
 	echo "[dotfiles] Installing Copilot coder plugin"
 	"${DOTFILES_DIR}/install-copilot-plugin"
 
+	# grepika skills — installed fresh from upstream agentika-labs/grepika
+	# (NOT JasonMore/ai-skills, which is Jason-authored skills only).
+	# Runs after the other Codespaces skill installers above so it wins any
+	# same-name conflicts with them, but still before install_personal_ai_skills.
+	echo "[dotfiles] Installing grepika skills"
+	"${DOTFILES_DIR}/install-grepika-skills"
+
 fi
 
-# Install personal skills last so external installers cannot overwrite them.
+# Install personal skills last so external installers (including
+# install-grepika-skills above) cannot overwrite them.
 install_personal_ai_skills

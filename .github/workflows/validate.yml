@@ -33,6 +33,13 @@ jobs:
           fi
           echo "✅ install-agent-skills script syntax is valid"
 
+          # Check install-grepika-skills script
+          if ! bash -n install-grepika-skills; then
+            echo "❌ install-grepika-skills script has syntax errors"
+            exit 1
+          fi
+          echo "✅ install-grepika-skills script syntax is valid"
+
       - name: Validate zsh configuration
         run: |
           echo "Validating .zshrc..."
@@ -71,6 +78,12 @@ jobs:
             exit 1
           fi
           echo "✅ install-agent-skills is executable"
+
+          if [[ ! -x "install-grepika-skills" ]]; then
+            echo "❌ install-grepika-skills should be executable"
+            exit 1
+          fi
+          echo "✅ install-grepika-skills is executable"
           
           if [[ -x ".zshrc" ]]; then
             echo "❌ .zshrc should NOT be executable"
@@ -96,7 +109,7 @@ jobs:
           fi
           
           # Check for proper shell options in scripts
-          for script in install install-agent-skills; do
+          for script in install install-agent-skills install-grepika-skills; do
             if ! grep -q "set -e" "$script"; then
               echo "⚠️  Warning: $script doesn't use 'set -e' for error handling"
             fi
