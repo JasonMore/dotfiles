@@ -34,6 +34,27 @@ fi
 
 mkdir -p "${TARGET_DIR}"
 
+# Upstream grepika skills are authored for Claude Code: their SKILL.md
+# frontmatter/body reference mcp__grepika__<tool> MCP tool names,
+# ~/.claude/blueprints paths, and Claude slash-command/$ARGUMENTS syntax
+# that don't exist in Copilot (Copilot exposes grepika-<tool> instead).
+# Rewrite only the installed copy under ~/.copilot/skills so skills are
+# actually usable with Copilot — never touch the upstream clone (it's
+# discarded on exit) or JasonMore/ai-skills.
+adapt_skill_for_copilot() {
+	local file="$1"
+	local tmp
+	tmp="$(mktemp)"
+	sed -E \
+		-e 's/mcp__grepika__([a-zA-Z_]+)/grepika-\1/g' \
+		-e 's#~/\.claude/blueprints#~/.copilot/blueprints#g' \
+		-e 's/\$ARGUMENTS/(derive this from context; not a literal variable)/g' \
+		-e 's#`/index`#`grepika-index`#g' \
+		-e 's#`/#`#g' \
+		"${file}" > "${tmp}"
+	mv "${tmp}" "${file}"
+}
+
 # Build the expected skill list up front (only dirs with a SKILL.md count
 # as real skills) so we can verify installation completeness at the end.
 expected_skills=()
@@ -61,6 +82,9 @@ for skill_name in "${expected_skills[@]}"; do
 		echo "[grepika-skills] Error: Failed to copy skill '${skill_name}'"
 		exit 1
 	fi
+	if [[ -f "${TARGET_DIR}/${skill_name}/SKILL.md" ]]; then
+		adapt_skill_for_copilot "${TARGET_DIR}/${skill_name}/SKILL.md"
+	fi
 done
 
 # Verify every expected skill (including any references/ subdirectories,
@@ -77,6 +101,14 @@ for skill_name in "${expected_skills[@]}"; do
 	target_file_count=$(find "${TARGET_DIR}/${skill_name}" -type f | wc -l | tr -d ' ')
 	if [[ "${source_file_count}" != "${target_file_count}" ]]; then
 		echo "[grepika-skills] Error: ${skill_name} file count mismatch (source=${source_file_count}, target=${target_file_count}); references may not have copied fully"
+		missing_skills+=("${skill_name}")
+	fi
+	if grep -q 'mcp__grepika__' "${TARGET_DIR}/${skill_name}/SKILL.md" 2>/dev/null; then
+		echo "[grepika-skills] Error: ${skill_name}/SKILL.md still contains Claude-only mcp__grepika__ tool names after adaptation"
+		missing_skills+=("${skill_name}")
+	fi
+	if grep -q '\.claude/blueprints' "${TARGET_DIR}/${skill_name}/SKILL.md" 2>/dev/null; then
+		echo "[grepika-skills] Error: ${skill_name}/SKILL.md still references ~/.claude/blueprints after adaptation"
 		missing_skills+=("${skill_name}")
 	fi
 done
