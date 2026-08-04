@@ -34,13 +34,19 @@ fi
 
 mkdir -p "${TARGET_DIR}"
 
-# Upstream grepika skills are authored for Claude Code: their SKILL.md
-# frontmatter/body reference mcp__grepika__<tool> MCP tool names,
-# ~/.claude/blueprints paths, and Claude slash-command/$ARGUMENTS syntax
-# that don't exist in Copilot (Copilot exposes grepika-<tool> instead).
-# Rewrite only the installed copy under ~/.copilot/skills so skills are
-# actually usable with Copilot; never touch the upstream clone (it's
-# discarded on exit) or JasonMore/ai-skills.
+# Upstream grepika skills are authored for Claude Code: their Markdown
+# files (SKILL.md and any references/*.md they load) reference
+# mcp__grepika__<tool> MCP tool names, ~/.claude/blueprints paths, and
+# Claude slash-command/$ARGUMENTS syntax that don't exist in Copilot
+# (Copilot exposes grepika-<tool> instead). Rewrite only the installed
+# copy under ~/.copilot/skills so skills are actually usable with
+# Copilot; never touch the upstream clone (it's discarded on exit) or
+# JasonMore/ai-skills.
+#
+# Slash-command names are replaced explicitly (not a broad `/` -> ``
+# strip, which could corrupt legitimate backticked absolute paths).
+# Longer/more specific names are listed first so e.g. /index-status is
+# never partially rewritten by the shorter /index rule.
 adapt_skill_for_copilot() {
 	local file="$1"
 	local tmp
@@ -49,8 +55,10 @@ adapt_skill_for_copilot() {
 		-e 's/mcp__grepika__([a-zA-Z_]+)/grepika-\1/g' \
 		-e 's#~/\.claude/blueprints#~/.copilot/blueprints#g' \
 		-e 's/\$ARGUMENTS/(derive this from context; not a literal variable)/g' \
-		-e 's#`/index`#`grepika-index`#g' \
-		-e 's#`/#`#g' \
+		-e 's#/index-status#index-status#g' \
+		-e 's#/apply-pattern#apply-pattern#g' \
+		-e 's#/study([^a-zA-Z0-9_-]|$)#study\1#g' \
+		-e 's#/index([^a-zA-Z0-9_-]|$)#grepika-index\1#g' \
 		"${file}" > "${tmp}"
 	mv "${tmp}" "${file}"
 }
@@ -82,9 +90,13 @@ for skill_name in "${expected_skills[@]}"; do
 		echo "[grepika-skills] Error: Failed to copy skill '${skill_name}'"
 		exit 1
 	fi
-	if [[ -f "${TARGET_DIR}/${skill_name}/SKILL.md" ]]; then
-		adapt_skill_for_copilot "${TARGET_DIR}/${skill_name}/SKILL.md"
-	fi
+	# Adapt every Markdown file in the installed skill, not just
+	# SKILL.md: references/*.md files (e.g. index-status's
+	# troubleshooting.md) are also loaded by skills and can carry the
+	# same Claude-only identifiers.
+	while IFS= read -r -d '' md_file; do
+		adapt_skill_for_copilot "${md_file}"
+	done < <(find "${TARGET_DIR}/${skill_name}" -type f -name '*.md' -print0)
 done
 
 # Verify every expected skill (including any references/ subdirectories,
@@ -103,12 +115,20 @@ for skill_name in "${expected_skills[@]}"; do
 		echo "[grepika-skills] Error: ${skill_name} file count mismatch (source=${source_file_count}, target=${target_file_count}); references may not have copied fully"
 		missing_skills+=("${skill_name}")
 	fi
-	if grep -q 'mcp__grepika__' "${TARGET_DIR}/${skill_name}/SKILL.md" 2>/dev/null; then
-		echo "[grepika-skills] Error: ${skill_name}/SKILL.md still contains Claude-only mcp__grepika__ tool names after adaptation"
+	if grep -rlq 'mcp__grepika__' "${TARGET_DIR}/${skill_name}" --include='*.md' 2>/dev/null; then
+		echo "[grepika-skills] Error: ${skill_name} still contains Claude-only mcp__grepika__ tool names after adaptation"
 		missing_skills+=("${skill_name}")
 	fi
-	if grep -q '\.claude/blueprints' "${TARGET_DIR}/${skill_name}/SKILL.md" 2>/dev/null; then
-		echo "[grepika-skills] Error: ${skill_name}/SKILL.md still references ~/.claude/blueprints after adaptation"
+	if grep -rlq '\.claude/blueprints' "${TARGET_DIR}/${skill_name}" --include='*.md' 2>/dev/null; then
+		echo "[grepika-skills] Error: ${skill_name} still references ~/.claude/blueprints after adaptation"
+		missing_skills+=("${skill_name}")
+	fi
+	if grep -rlq '\$ARGUMENTS' "${TARGET_DIR}/${skill_name}" --include='*.md' 2>/dev/null; then
+		echo "[grepika-skills] Error: ${skill_name} still contains a literal \$ARGUMENTS placeholder after adaptation"
+		missing_skills+=("${skill_name}")
+	fi
+	if grep -rlqE '/index-status|/index([^a-zA-Z0-9_-]|$)|/apply-pattern|/study([^a-zA-Z0-9_-]|$)' "${TARGET_DIR}/${skill_name}" --include='*.md' 2>/dev/null; then
+		echo "[grepika-skills] Error: ${skill_name} still contains an unadapted Claude slash-command reference"
 		missing_skills+=("${skill_name}")
 	fi
 done
