@@ -18,7 +18,7 @@ trap cleanup EXIT
 # Clone the upstream grepika repository fresh each run so skills always
 # reflect what agentika-labs currently ships. This repo (dotfiles) is not
 # the source of truth for grepika skills, and JasonMore/ai-skills is
-# Jason-authored skills only — neither should ever carry grepika content.
+# Jason-authored skills only; neither should ever carry grepika content.
 echo "[grepika-skills] Cloning agentika-labs/grepika..."
 if ! git clone --depth=1 "${SKILLS_REPO}" "${TEMP_DIR}"; then
 	echo "[grepika-skills] Error: Failed to clone agentika-labs/grepika"
@@ -39,7 +39,7 @@ mkdir -p "${TARGET_DIR}"
 # ~/.claude/blueprints paths, and Claude slash-command/$ARGUMENTS syntax
 # that don't exist in Copilot (Copilot exposes grepika-<tool> instead).
 # Rewrite only the installed copy under ~/.copilot/skills so skills are
-# actually usable with Copilot — never touch the upstream clone (it's
+# actually usable with Copilot; never touch the upstream clone (it's
 # discarded on exit) or JasonMore/ai-skills.
 adapt_skill_for_copilot() {
 	local file="$1"

@@ -14,8 +14,8 @@ Prefer grepika MCP tools over built-in `grep`/`glob`/`view` for code search, fil
 
 | Task | Use This Tool | Instead Of |
 |------|---------------|------------|
-| Set workspace (global mode only) | `grepika-add_workspace` | N/A — call first, before any other grepika tool, when in global mode |
-| Build/update index | `grepika-index` | N/A — run before indexed search or graph navigation |
+| Set workspace (global mode only) | `grepika-add_workspace` | N/A: call first, before any other grepika tool, when in global mode |
+| Build/update index | `grepika-index` | N/A: run before `grepika-search` or `grepika-graph` |
 | Pattern/keyword search | `grepika-search` | `grep` tool |
 | Get file/line-range content | `grepika-get` | `view` (for search results) |
 | File structure/symbols | `grepika-outline` | Manual parsing |
@@ -28,8 +28,8 @@ Prefer grepika MCP tools over built-in `grep`/`glob`/`view` for code search, fil
 | Index health/stats | `grepika-stats` | N/A |
 
 - In global mode, call `grepika-add_workspace` with the project root before using any other grepika tool.
-- Run `grepika-index` before relying on indexed search (`grepika-search`, `grepika-refs`) or `grepika-graph`; it updates incrementally on later runs.
-- Still use the built-in `view` tool for files whose path is already known, and `bash`/shell for git operations, builds, and running tests — grepika is read-only and does not replace those.
+- Run `grepika-index` before `grepika-search` or `grepika-graph`; both require an index. `grepika-refs`, `grepika-outline`, `grepika-toc`, `grepika-structural_search`, and `grepika-context` do not require an index. The index updates incrementally on later runs.
+- Still use the built-in `view` tool for files whose path is already known, and `bash`/shell for git operations, builds, and running tests. grepika is read-only and does not replace those.
 
 ## Commenting on PRs and Issues
 - **REQUIRED:** Any time you comment as me on a PR or issue, prepend the message with `[from copilot-cli]`.

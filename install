@@ -194,7 +194,7 @@ if [[ -n "${CODESPACES:-}" ]]; then
 	echo "[dotfiles] Adding gh-stack skill"
 	npx skills add github/gh-stack
   
-	# User agent skills (caveman etc.) — installed fresh from source
+	# User agent skills (caveman etc.): installed fresh from source
 	echo "[dotfiles] Installing caveman skills"
 	"${DOTFILES_DIR}/install-caveman-skills"
 
@@ -202,7 +202,7 @@ if [[ -n "${CODESPACES:-}" ]]; then
 	echo "[dotfiles] Installing Copilot coder plugin"
 	"${DOTFILES_DIR}/install-copilot-plugin"
 
-	# grepika skills — installed fresh from upstream agentika-labs/grepika
+	# grepika skills: installed fresh from upstream agentika-labs/grepika
 	# (NOT JasonMore/ai-skills, which is Jason-authored skills only).
 	# Runs after the other Codespaces skill installers above so it wins any
 	# same-name conflicts with them, but still before install_personal_ai_skills.
