@@ -5,6 +5,14 @@
       "args": [
         "@playwright/mcp@latest"
       ]
+    },
+    "grepika": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@agentika/grepika@latest",
+        "--mcp"
+      ]
     }
   }
 }
