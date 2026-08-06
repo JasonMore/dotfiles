@@ -19,7 +19,7 @@ jobs:
         run: |
           echo "Validating bash scripts..."
 
-          scripts=(install install-agent-skills install-caveman-skills install-copilot-plugin workspace.sh tests/run_tests.sh tests/mocks/bin/sudo tests/mocks/bin/chsh tests/mocks/bin/git tests/mocks/bin/gh tests/mocks/bin/npx tests/mocks/bin/curl)
+          scripts=(install install-agent-skills install-caveman-skills install-copilot-plugin install-grepika-skills workspace.sh tests/run_tests.sh tests/mocks/bin/sudo tests/mocks/bin/chsh tests/mocks/bin/git tests/mocks/bin/gh tests/mocks/bin/npx tests/mocks/bin/curl)
           for script in "${scripts[@]}"; do
             if ! bash -n "$script"; then
               echo "❌ ${script} has syntax errors"
@@ -61,7 +61,7 @@ jobs:
         run: |
           echo "Checking executable permissions..."
 
-          for script in install install-agent-skills install-caveman-skills install-copilot-plugin workspace.sh tests/run_tests.sh tests/mocks/bin/sudo tests/mocks/bin/chsh tests/mocks/bin/git tests/mocks/bin/gh tests/mocks/bin/npx tests/mocks/bin/curl; do
+          for script in install install-agent-skills install-caveman-skills install-copilot-plugin install-grepika-skills workspace.sh tests/run_tests.sh tests/mocks/bin/sudo tests/mocks/bin/chsh tests/mocks/bin/git tests/mocks/bin/gh tests/mocks/bin/npx tests/mocks/bin/curl; do
             if [[ ! -x "$script" ]]; then
               echo "❌ ${script} should be executable"
               exit 1
@@ -93,7 +93,7 @@ jobs:
           fi
           
           # Check for proper shell options in scripts
-          for script in install install-agent-skills install-caveman-skills install-copilot-plugin; do
+          for script in install install-agent-skills install-caveman-skills install-copilot-plugin install-grepika-skills; do
             if ! grep -q "set -e" "$script"; then
               echo "⚠️  Warning: $script doesn't use 'set -e' for error handling"
             fi

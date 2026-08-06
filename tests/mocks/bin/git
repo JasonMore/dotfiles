@@ -15,6 +15,42 @@ if [[ "${1:-}" == "clone" ]]; then
 		exit 1
 	fi
 
+	if [[ "${args[*]}" == *"agentika-labs/grepika.git"* ]]; then
+		if [[ "${MOCK_GIT_GREPIKA_CLONE_FAIL:-0}" == "1" ]]; then
+			echo "[mock-git] simulated clone failure for ${target}" >&2
+			exit 1
+		fi
+		# Fixture mirrors agentika-labs/grepika's real layout
+		# (plugins/grepika/skills/<skill>/SKILL.md) with Claude-only
+		# identifiers (mcp__grepika__, ~/.claude/blueprints, $ARGUMENTS,
+		# and slash commands) alongside a source file path that looks
+		# like a slash command substring (src/index.ts), so tests can
+		# verify install-grepika-skills both adapts the former and
+		# leaves the latter untouched.
+		skill_dir="${target}/plugins/grepika/skills/example-grepika-skill"
+		mkdir -p "${target}/.git" "${skill_dir}/references"
+		echo "ref: refs/heads/main" > "${target}/.git/HEAD"
+		cat > "${skill_dir}/SKILL.md" <<'SKILL_EOF'
+# Example grepika skill
+
+Run /index to build the index, then /index-status to check progress.
+Call /apply-pattern once you /study the results.
+Uses the mcp__grepika__search tool under the hood.
+Blueprints live at ~/.claude/blueprints/example.
+Invoke with $ARGUMENTS.
+
+See src/index.ts and docs/index-status.md for the reference implementation;
+these file paths must not be rewritten.
+SKILL_EOF
+		cat > "${skill_dir}/references/troubleshooting.md" <<'REF_EOF'
+# Troubleshooting
+
+If `/index` fails, check src/index.ts for a stale build.
+REF_EOF
+		echo "[mock-git] cloned (mocked) into ${target}"
+		exit 0
+	fi
+
 	mkdir -p "${target}/.git" "${target}/skills/example-skill"
 	echo "ref: refs/heads/main" > "${target}/.git/HEAD"
 	echo "# Example skill" > "${target}/skills/example-skill/SKILL.md"
