@@ -65,14 +65,16 @@ CS_SNAP="$STATE_DIR/notify-codespace-snapshot.tsv"   # name<TAB>session_id<TAB>l
 # turn-based (is_running is NOT maintained for CLI sessions), mirroring
 # poll_codespaces but against the local db.
 MONITOR_LOCAL="${MONITOR_LOCAL:-1}"
-# Colon-separated cwd prefixes that mark app-managed (not terminal-CLI)
+# Newline-separated cwd prefixes that mark app-managed (not terminal-CLI)
 # sessions; excluded. Prefer explicit, narrow prefixes over a broad one so
 # legitimate CLI checkouts under $STATE_DIR (repos/, ai-skills/, ...) aren't
 # swept up. LOCAL_EXCLUDE_PREFIX (singular, legacy/back-compat) is still
 # honored and appended to the list if set.
-LOCAL_EXCLUDE_PREFIXES="${LOCAL_EXCLUDE_PREFIXES:-$STATE_DIR/copilot-worktrees/:$STATE_DIR/chats/}"
+LOCAL_EXCLUDE_PREFIXES="${LOCAL_EXCLUDE_PREFIXES:-$STATE_DIR/copilot-worktrees/
+$STATE_DIR/chats/}"
 if [ -n "${LOCAL_EXCLUDE_PREFIX:-}" ]; then
-  LOCAL_EXCLUDE_PREFIXES="${LOCAL_EXCLUDE_PREFIXES}:${LOCAL_EXCLUDE_PREFIX}"
+  LOCAL_EXCLUDE_PREFIXES="${LOCAL_EXCLUDE_PREFIXES}
+${LOCAL_EXCLUDE_PREFIX}"
 fi
 # Only consider sessions touched within this window (bounds the query + snapshot).
 LOCAL_MAX_AGE="${LOCAL_MAX_AGE:-2 days}"
@@ -156,15 +158,12 @@ snapshot_tasks() {
 snapshot_local() {
   [ -f "$SESSION_STORE_DB" ] || return 0
   local prefix esc_prefix plen exclude_sql=""
-  local old_ifs="$IFS" prefixes=()
-  IFS=':' read -r -a prefixes <<< "$LOCAL_EXCLUDE_PREFIXES"
-  IFS="$old_ifs"
-  for prefix in "${prefixes[@]}"; do
+  while IFS= read -r prefix; do
     [ -z "$prefix" ] && continue
     plen="${#prefix}"
     esc_prefix="$(printf '%s' "$prefix" | sed "s/'/''/g")"
     exclude_sql="${exclude_sql} AND substr(s.cwd,1,$plen) <> '${esc_prefix}'"
-  done
+  done <<< "$LOCAL_EXCLUDE_PREFIXES"
   sqlite3 -noheader -separator $'\t' "file:$SESSION_STORE_DB?mode=ro" "
     SELECT s.id,
            t.turn_index,
