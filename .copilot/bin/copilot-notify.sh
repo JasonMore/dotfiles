@@ -59,12 +59,21 @@ CS_SNAP="$STATE_DIR/notify-codespace-snapshot.tsv"   # name<TAB>session_id<TAB>l
 # about. Their state lives in ~/.copilot/session-store.db (same schema the
 # codespace poller reads remotely); a finished turn = a new non-empty
 # assistant_response. App sessions are separated out by cwd: the app runs its
-# sessions under $HOME/.copilot/ (copilot-worktrees/ and chats/), terminal CLI
-# sessions run in real repo dirs. Detection is turn-based (is_running is NOT
-# maintained for CLI sessions), mirroring poll_codespaces but against the local db.
+# sessions under specific $STATE_DIR subdirs (copilot-worktrees/ and chats/),
+# NOT all of $STATE_DIR -- terminal CLI checkouts like ~/.copilot/repos/* and
+# ~/.copilot/ai-skills are real repo dirs and must stay included. Detection is
+# turn-based (is_running is NOT maintained for CLI sessions), mirroring
+# poll_codespaces but against the local db.
 MONITOR_LOCAL="${MONITOR_LOCAL:-1}"
-# cwd prefix that marks an app-managed (not terminal-CLI) session; excluded.
-LOCAL_EXCLUDE_PREFIX="${LOCAL_EXCLUDE_PREFIX:-$HOME/.copilot/}"
+# Colon-separated cwd prefixes that mark app-managed (not terminal-CLI)
+# sessions; excluded. Prefer explicit, narrow prefixes over a broad one so
+# legitimate CLI checkouts under $STATE_DIR (repos/, ai-skills/, ...) aren't
+# swept up. LOCAL_EXCLUDE_PREFIX (singular, legacy/back-compat) is still
+# honored and appended to the list if set.
+LOCAL_EXCLUDE_PREFIXES="${LOCAL_EXCLUDE_PREFIXES:-$STATE_DIR/copilot-worktrees/:$STATE_DIR/chats/}"
+if [ -n "${LOCAL_EXCLUDE_PREFIX:-}" ]; then
+  LOCAL_EXCLUDE_PREFIXES="${LOCAL_EXCLUDE_PREFIXES}:${LOCAL_EXCLUDE_PREFIX}"
+fi
 # Only consider sessions touched within this window (bounds the query + snapshot).
 LOCAL_MAX_AGE="${LOCAL_MAX_AGE:-2 days}"
 # State file cols: session_id<TAB>last_turn
@@ -137,22 +146,35 @@ snapshot_tasks() {
 
 # Snapshot of local terminal-CLI sessions with their latest COMPLETED turn.
 # Emits: session_id<TAB>turn_index<TAB>cwd<TAB>response  (one row per active CLI
-# session). App-managed sessions (cwd under $LOCAL_EXCLUDE_PREFIX) are excluded,
-# as are those with no cwd. Only sessions updated within $LOCAL_MAX_AGE count.
+# session). App-managed sessions (cwd under any $LOCAL_EXCLUDE_PREFIXES entry)
+# are excluded, as are those with no cwd. Only sessions updated within
+# $LOCAL_MAX_AGE count. Exclusion uses an exact-length substr() prefix compare
+# (not LIKE) so path characters like % and _ can never be misinterpreted as
+# SQL wildcards. cwd/response newlines and CRs are flattened to spaces in-query
+# so embedded control chars can't corrupt downstream TAB/newline-delimited
+# parsing of the TSV output.
 snapshot_local() {
   [ -f "$SESSION_STORE_DB" ] || return 0
-  local esc
-  esc="$(printf '%s' "$LOCAL_EXCLUDE_PREFIX" | sed "s/'/''/g")"
+  local prefix esc_prefix plen exclude_sql=""
+  local old_ifs="$IFS" prefixes=()
+  IFS=':' read -r -a prefixes <<< "$LOCAL_EXCLUDE_PREFIXES"
+  IFS="$old_ifs"
+  for prefix in "${prefixes[@]}"; do
+    [ -z "$prefix" ] && continue
+    plen="${#prefix}"
+    esc_prefix="$(printf '%s' "$prefix" | sed "s/'/''/g")"
+    exclude_sql="${exclude_sql} AND substr(s.cwd,1,$plen) <> '${esc_prefix}'"
+  done
   sqlite3 -noheader -separator $'\t' "file:$SESSION_STORE_DB?mode=ro" "
     SELECT s.id,
            t.turn_index,
-           s.cwd,
+           replace(replace(s.cwd,char(10),' '),char(13),' '),
            substr(replace(replace(t.assistant_response,char(10),' '),char(13),' '),1,$BODY_MAX)
     FROM sessions s
     JOIN turns t ON t.session_id = s.id
     WHERE s.updated_at > datetime('now','-$LOCAL_MAX_AGE')
       AND s.cwd IS NOT NULL AND trim(s.cwd) <> ''
-      AND s.cwd NOT LIKE '${esc}%'
+      ${exclude_sql}
       AND t.assistant_response IS NOT NULL AND trim(t.assistant_response) <> ''
       AND t.turn_index = (SELECT MAX(t2.turn_index) FROM turns t2
                           WHERE t2.session_id = s.id
