@@ -18,6 +18,16 @@ if [[ "${1:-}" == "clone" ]]; then
 	mkdir -p "${target}/.git" "${target}/skills/example-skill"
 	echo "ref: refs/heads/main" > "${target}/.git/HEAD"
 	echo "# Example skill" > "${target}/skills/example-skill/SKILL.md"
+	if [[ "${args[*]}" == *"JasonMore/ai-skills.git"* ]]; then
+		cat > "${target}/install" <<'INSTALL_EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+echo "[mock-ai-skills] install ran"
+mkdir -p "$(dirname "$0")/.marker"
+date +%s > "$(dirname "$0")/.marker/personal-ai-skills-installed"
+INSTALL_EOF
+		chmod +x "${target}/install"
+	fi
 	echo "[mock-git] cloned (mocked) into ${target}"
 	exit 0
 fi

@@ -223,6 +223,18 @@ test_personal_ai_skills_install_last_and_present() {
 	fi
 }
 
+test_personal_ai_skills_clone_does_not_need_gh_auth() {
+	local home_dir output status=0
+	home_dir="$(fresh_home "personal-skills-without-gh-auth")"
+	output="$(run_install "${home_dir}" MOCK_GH_CLONE_FAIL=1)" || status=$?
+
+	assert_equals "${status}" "0"
+	assert_file_exists "${home_dir}/.copilot/ai-skills/.marker/personal-ai-skills-installed"
+	assert_contains "${output}" "Optional step succeeded: Personal AI skills sync"
+	assert_contains "${output}" "Optional step succeeded: Personal AI skills install"
+	assert_not_contains "${output}" "simulated 'repo clone' failure"
+}
+
 test_second_run_is_idempotent() {
 	local home_dir first_output second_output first_status=0 second_status=0
 	home_dir="$(fresh_home "idempotent-rerun")"
@@ -256,6 +268,7 @@ run_test test_atuin_network_failure_does_not_abort_install
 run_test test_optional_failures_continue_to_later_steps
 run_test test_core_dotfile_links_are_created
 run_test test_personal_ai_skills_install_last_and_present
+run_test test_personal_ai_skills_clone_does_not_need_gh_auth
 run_test test_second_run_is_idempotent
 
 rm -rf -- "${SCRATCH_ROOT}"

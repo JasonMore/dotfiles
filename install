@@ -149,7 +149,7 @@ install_personal_ai_skills_sync() {
 		git -C "${ai_skills_dir}" pull --ff-only || return 1
 	else
 		safe_rm_rf "${ai_skills_dir}" || return 1
-		gh repo clone JasonMore/ai-skills "${ai_skills_dir}" || return 1
+		git clone https://github.com/JasonMore/ai-skills.git "${ai_skills_dir}" || return 1
 	fi
 }
 

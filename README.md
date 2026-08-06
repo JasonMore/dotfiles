@@ -18,9 +18,10 @@ step failed.
 
 ## Repairing a partial Codespaces install
 
-If a Codespace was created before this fix, an earlier optional-step failure
-(e.g. Atuin login) may have aborted the install before agent config or
-personal AI skills were set up, and Codespaces won't rerun it automatically.
+If a Codespace was created before this fix, an optional-step failure may have
+aborted the install before personal AI skills were set up. One observed case
+was `gh repo clone` running before GitHub CLI authentication was ready.
+Codespaces won't rerun the install automatically.
 To repair it, rerun the installer manually from the Codespace terminal:
 
 ```sh
