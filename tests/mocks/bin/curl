@@ -1,0 +1,47 @@
+#!/usr/bin/env bash
+# Test mock for curl. Only the Atuin setup script download is exercised by
+# install; everything else is unexpected in tests and fails loudly.
+set -euo pipefail
+
+url=""
+for arg in "$@"; do
+	case "${arg}" in
+		http*) url="${arg}" ;;
+	esac
+done
+
+if [[ "${url}" == *setup.atuin.sh* ]]; then
+	if [[ "${MOCK_CURL_ATUIN_FAIL:-0}" == "1" ]]; then
+		echo "[mock-curl] simulated network failure fetching ${url}" >&2
+		exit 1
+	fi
+
+	mkdir -p "${HOME}/.atuin/bin"
+	cat > "${HOME}/.atuin/bin/atuin" <<'ATUIN_SCRIPT'
+#!/usr/bin/env bash
+set -euo pipefail
+if [[ "${1:-}" == "login" ]]; then
+	echo "[mock-atuin] login called"
+	if [[ "${MOCK_ATUIN_LOGIN_FAIL:-0}" == "1" ]]; then
+		echo "[mock-atuin] login failed (simulated)" >&2
+		exit 1
+	fi
+	echo "[mock-atuin] login succeeded"
+	exit 0
+fi
+exit 0
+ATUIN_SCRIPT
+	chmod +x "${HOME}/.atuin/bin/atuin"
+
+	cat > "${HOME}/.atuin/bin/env" <<'ENV_SCRIPT'
+export PATH="${HOME}/.atuin/bin:${PATH}"
+ENV_SCRIPT
+
+	# This output becomes `sh`'s stdin in `curl ... | sh`; a comment is a
+	# harmless no-op since the real work above already happened.
+	echo "# mock atuin install complete"
+	exit 0
+fi
+
+echo "[mock-curl] unhandled invocation: $*" >&2
+exit 1

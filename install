@@ -2,6 +2,56 @@
 
 set -euo pipefail
 
+# ---------------------------------------------------------------------------
+# Reliability model
+#
+# CORE steps: local, deterministic, no secrets/network/external installers.
+# They must remain strict; if one fails the script aborts (set -euo pipefail).
+#
+# OPTIONAL steps: anything that depends on secrets, auth, network access, or
+# an external installer/CLI (Atuin, gh extensions, npx skills, cloned repos,
+# etc). These must never abort the whole install. Each optional step is run
+# through run_optional_step, which reports the exact step name and exit
+# status on failure and then continues to the next step. Personal AI skills
+# are installed last (still as an optional step) so they remain authoritative
+# even if an earlier optional integration fails.
+# ---------------------------------------------------------------------------
+
+OPTIONAL_FAILURES=()
+
+# run_optional_step NAME CMD [ARGS...]
+# Runs CMD as an optional step. Failures are reported by exact NAME and exit
+# status, then execution continues. Step functions must not rely on
+# `set -e` internally (it is suspended for commands used as an `if`
+# condition, including nested function calls) -- each step function is
+# responsible for explicitly returning non-zero on failure.
+run_optional_step() {
+	local step_name="$1"
+	shift
+	echo "[dotfiles] Optional step: ${step_name}"
+	if "$@"; then
+		echo "[dotfiles] Optional step succeeded: ${step_name}"
+	else
+		local status=$?
+		echo "[dotfiles] Warning: optional step failed (exit ${status}): ${step_name}; continuing" >&2
+		OPTIONAL_FAILURES+=("${step_name} (exit ${status})")
+	fi
+}
+
+# safe_rm_rf TARGET
+# rm -rf guarded against empty/root/home paths, used by optional clone
+# helpers that replace a fixed directory on re-clone.
+safe_rm_rf() {
+	local target="${1:-}"
+	if [[ -z "${target}" || "${target}" == "/" || "${target}" == "${HOME}" ]]; then
+		echo "[dotfiles] Refusing to remove unsafe path: '${target}'" >&2
+		return 1
+	fi
+	rm -rf -- "${target}"
+}
+
+# --- CORE: strict, must succeed --------------------------------------------
+
 # Codespaces uses zsh at /usr/bin/zsh; skip on local (e.g. macOS) where that path/chsh differs
 if [[ -n "${CODESPACES:-}" ]]; then
 	sudo chsh "$(id -un)" --shell "/usr/bin/zsh"
@@ -89,15 +139,26 @@ else
 	echo "[dotfiles] Warning: .copilot/mcp-config.json not found, skipping"
 fi
 
-install_personal_ai_skills() {
+# --- OPTIONAL: personal AI skills (defined here, run last) -----------------
+
+install_personal_ai_skills_sync() {
 	local ai_skills_dir="${HOME}/.copilot/ai-skills"
 
-	echo "[dotfiles] Installing personal AI skills"
+	echo "[dotfiles] Syncing personal AI skills"
 	if [[ -d "${ai_skills_dir}/.git" ]]; then
-		git -C "${ai_skills_dir}" pull --ff-only
+		git -C "${ai_skills_dir}" pull --ff-only || return 1
 	else
-		rm -rf -- "${ai_skills_dir}"
-		gh repo clone JasonMore/ai-skills "${ai_skills_dir}"
+		safe_rm_rf "${ai_skills_dir}" || return 1
+		git clone https://github.com/JasonMore/ai-skills.git "${ai_skills_dir}" || return 1
+	fi
+}
+
+install_personal_ai_skills_run() {
+	local ai_skills_dir="${HOME}/.copilot/ai-skills"
+
+	if [[ ! -x "${ai_skills_dir}/install" ]]; then
+		echo "[dotfiles] Warning: ${ai_skills_dir}/install not found or not executable" >&2
+		return 1
 	fi
 	"${ai_skills_dir}/install"
 }
@@ -157,60 +218,122 @@ if [[ -n "${CODESPACES:-}" ]]; then
 		echo "[dotfiles] Warning: jq not found; skipping Ruby LSP machine settings update"
 	fi
 
-	# Atuin
-	if command -v atuin >/dev/null 2>&1; then
-		echo "[dotfiles] Atuin already installed"
-	else
+	# --- OPTIONAL: Atuin (secrets, network, external installer) ------------
+	#
+	# Codespaces may not define ATUIN_USERNAME/ATUIN_KEY/ATUIN_PASSWORD (e.g.
+	# forks, PR-triggered Codespaces without repo secrets). Every read below
+	# uses ${VAR:-} so a missing secret never trips `set -u`, and login is
+	# skipped (with a warning naming only the missing variable, never a
+	# value) rather than aborting the whole install.
+
+	install_atuin_optional() {
+		# Pick up an existing install even when non-VS Code shells omit Atuin
+		# from PATH, such as `gh codespace ssh` sessions.
+		# shellcheck disable=SC1090
+		[[ -f "${HOME}/.atuin/bin/env" ]] && source "${HOME}/.atuin/bin/env"
+		if command -v atuin >/dev/null 2>&1; then
+			echo "[dotfiles] Atuin already installed"
+			return 0
+		fi
 		echo "[dotfiles] Installing Atuin"
-		curl --proto '=https' --tlsv1.2 -LsSf https://setup.atuin.sh | sh
-		source $HOME/.atuin/bin/env
-	fi
+		curl --proto '=https' --tlsv1.2 -LsSf https://setup.atuin.sh | sh || return 1
+		# shellcheck disable=SC1090
+		source "${HOME}/.atuin/bin/env" || return 1
+	}
 
-	if command -v atuin >/dev/null 2>&1; then
-		atuin login -u "$ATUIN_USERNAME" -k "$ATUIN_KEY" -p "$ATUIN_PASSWORD"
-	else
-		echo "[dotfiles] Skipping Atuin login (atuin command missing)"
-	fi
+	run_atuin_login() {
+		local missing=()
+		[[ -n "${ATUIN_USERNAME:-}" ]] || missing+=("ATUIN_USERNAME")
+		[[ -n "${ATUIN_KEY:-}" ]] || missing+=("ATUIN_KEY")
+		[[ -n "${ATUIN_PASSWORD:-}" ]] || missing+=("ATUIN_PASSWORD")
 
-	# Copilot agent configuration
-	echo "[dotfiles] Setting up Copilot agent configuration"
-	if [[ -d "${DOTFILES_DIR}/.github/agents" ]]; then
-		mkdir -p "${HOME}/.github/agents"
-		cp -r "${DOTFILES_DIR}/.github/agents/"* "${HOME}/.github/agents/"
+		if [[ ${#missing[@]} -gt 0 ]]; then
+			echo "[dotfiles] Warning: skipping Atuin login; missing env var(s): ${missing[*]}" >&2
+			return 0
+		fi
+
+		# Pick up atuin from this run's install even if it wasn't on PATH yet.
+		# shellcheck disable=SC1090
+		[[ -f "${HOME}/.atuin/bin/env" ]] && source "${HOME}/.atuin/bin/env"
+
+		if ! command -v atuin >/dev/null 2>&1; then
+			echo "[dotfiles] Warning: skipping Atuin login; atuin command not found" >&2
+			return 0
+		fi
+
+		atuin login -u "${ATUIN_USERNAME}" -k "${ATUIN_KEY}" -p "${ATUIN_PASSWORD}" || return 1
+	}
+
+	run_optional_step "Atuin install" install_atuin_optional
+	run_optional_step "Atuin login" run_atuin_login
+
+	# --- OPTIONAL: Copilot agent configuration ------------------------------
+
+	copy_copilot_agent_config() {
+		if [[ ! -d "${DOTFILES_DIR}/.github/agents" ]]; then
+			echo "[dotfiles] Warning: ${DOTFILES_DIR}/.github/agents not found, skipping agent config setup" >&2
+			return 1
+		fi
+		mkdir -p "${HOME}/.github/agents" || return 1
+		cp -r "${DOTFILES_DIR}/.github/agents/"* "${HOME}/.github/agents/" || return 1
 		echo "[dotfiles] Copied Copilot agent configuration"
-	else
-		echo "[dotfiles] Warning: ${DOTFILES_DIR}/.github/agents not found, skipping agent config setup"
-	fi
+	}
 
-	# Install agent skills
-	echo "[dotfiles] Installing agent skills"
-	"${DOTFILES_DIR}/install-agent-skills"
+	run_optional_step "Copilot agent configuration" copy_copilot_agent_config
 
-	# gh-stack
-	echo "[dotfiles] Installing gh-stack extension"
-	gh extension install github/gh-stack
-	echo "[dotfiles] Adding gh-stack aliases"
-	gh stack alias
-	echo "[dotfiles] Adding gh-stack skill"
-	npx skills add github/gh-stack
-  
-	# User agent skills (caveman etc.): installed fresh from source
-	echo "[dotfiles] Installing caveman skills"
-	"${DOTFILES_DIR}/install-caveman-skills"
+	# --- OPTIONAL: agent skills (external installer + gh extension) --------
 
-	# Install Copilot coder plugin
-	echo "[dotfiles] Installing Copilot coder plugin"
-	"${DOTFILES_DIR}/install-copilot-plugin"
+	run_optional_step "Agent skills" "${DOTFILES_DIR}/install-agent-skills"
 
-	# grepika skills: installed fresh from upstream agentika-labs/grepika
-	# (NOT JasonMore/ai-skills, which is Jason-authored skills only).
-	# Runs after the other Codespaces skill installers above so it wins any
-	# same-name conflicts with them, but still before install_personal_ai_skills.
-	echo "[dotfiles] Installing grepika skills"
-	"${DOTFILES_DIR}/install-grepika-skills"
+	# --- OPTIONAL: gh-stack (extension, aliases, skill) ---------------------
+
+	install_gh_stack_extension() {
+		gh extension install github/gh-stack
+	}
+	install_gh_stack_aliases() {
+		gh stack alias
+	}
+	install_gh_stack_skill() {
+		npx skills add github/gh-stack --yes --global
+	}
+
+	run_optional_step "gh-stack extension" install_gh_stack_extension
+	run_optional_step "gh-stack aliases" install_gh_stack_aliases
+	run_optional_step "gh-stack skill" install_gh_stack_skill
+
+	# --- OPTIONAL: caveman skills (external installer) ----------------------
+
+	run_optional_step "Caveman skills" "${DOTFILES_DIR}/install-caveman-skills"
+
+	# --- OPTIONAL: Copilot coder plugin (external installer) ----------------
+
+	run_optional_step "Copilot coder plugin" "${DOTFILES_DIR}/install-copilot-plugin"
+
+	# --- OPTIONAL: grepika skills (external installer) ----------------------
+	#
+	# Installed fresh from upstream agentika-labs/grepika (NOT
+	# JasonMore/ai-skills, which is Jason-authored skills only). Runs after
+	# the other Codespaces skill installers above so it wins any same-name
+	# conflicts with them, but still before personal AI skills below so
+	# personal skills stay authoritative.
+
+	run_optional_step "grepika skills" "${DOTFILES_DIR}/install-grepika-skills"
 
 fi
 
-# Install personal skills last so external installers (including
-# install-grepika-skills above) cannot overwrite them.
-install_personal_ai_skills
+# Install personal skills last so external installers cannot overwrite them.
+# Kept optional (like the other external integrations) so a failure here
+# still leaves the rest of the install intact and reruns cleanly.
+run_optional_step "Personal AI skills sync" install_personal_ai_skills_sync
+run_optional_step "Personal AI skills install" install_personal_ai_skills_run
+
+if [[ ${#OPTIONAL_FAILURES[@]} -gt 0 ]]; then
+	echo ""
+	echo "[dotfiles] Install finished with ${#OPTIONAL_FAILURES[@]} optional step(s) needing attention:"
+	for step in "${OPTIONAL_FAILURES[@]}"; do
+		echo "[dotfiles]   - ${step}"
+	done
+	echo "[dotfiles] Core setup succeeded. Re-run ./install to retry the optional step(s) above."
+else
+	echo "[dotfiles] Install complete; all steps succeeded."
+fi
