@@ -308,6 +308,112 @@ test_second_run_is_idempotent() {
 	assert_contains "${second_output}" "mock-git] pull (mocked, no-op)"
 }
 
+test_grepika_skill_adaptation_preserves_paths_and_adapts_commands() {
+	# Focused unit test for adapt_skill_for_copilot(), sourced directly (no
+	# network, no full install) so it runs fast and in isolation. This is
+	# the regression test for the /index sed rule that used to corrupt
+	# file paths like src/index.ts (see be2ded/613fbf1 history): it proves
+	# standalone slash-command references adapt while path-shaped
+	# substrings are left untouched.
+	local scratch_dir sample_file content status=0
+
+	scratch_dir="$(fresh_home "grepika-adapt-unit")"
+	mkdir -p "${scratch_dir}"
+	sample_file="${scratch_dir}/sample.md"
+	cat > "${sample_file}" <<'SAMPLE_EOF'
+Run /index to build the index, then /index-status to check progress.
+Call /apply-pattern once you /study the results.
+Uses the mcp__grepika__search tool under the hood.
+Blueprints live at ~/.claude/blueprints/example.
+Invoke with $ARGUMENTS.
+
+See src/index.ts and docs/index-status.md for the reference implementation;
+these file paths must not be rewritten.
+Also check lib/apply-pattern.rb and spec/study.rb, and `/index` in backticks.
+SAMPLE_EOF
+
+	(
+		# shellcheck disable=SC1090
+		source "${REPO_DIR}/install-grepika-skills"
+		adapt_skill_for_copilot "${sample_file}"
+	) || status=$?
+	assert_equals "${status}" "0" "sourcing install-grepika-skills and adapting must not error"
+
+	content="$(cat "${sample_file}")"
+
+	# Slash-command references (standalone tokens) must be adapted.
+	assert_contains "${content}" "Run grepika-index to build the index" "bare /index command should adapt"
+	assert_contains "${content}" "then index-status to check progress" "/index-status command should adapt"
+	assert_contains "${content}" "Call apply-pattern once you study the results" "/apply-pattern and /study commands should adapt"
+	assert_contains "${content}" '`grepika-index` in backticks' "backticked /index command should adapt"
+	assert_not_contains "${content}" "mcp__grepika__search" "Claude-only mcp tool name must be adapted"
+	assert_contains "${content}" "grepika-search tool" "mcp tool name should map to grepika-search"
+	assert_not_contains "${content}" ".claude/blueprints" "Claude blueprint path must be adapted"
+	assert_contains "${content}" "~/.copilot/blueprints/example" "blueprint path should map to ~/.copilot/blueprints"
+	assert_not_contains "${content}" '$ARGUMENTS' "literal \$ARGUMENTS placeholder must be adapted"
+
+	# File paths that merely contain a slash-command substring must be
+	# left byte-for-byte unchanged -- this is the regression case.
+	assert_contains "${content}" "See src/index.ts and docs/index-status.md for the reference implementation" "file paths must survive adaptation unchanged"
+	assert_contains "${content}" "Also check lib/apply-pattern.rb and spec/study.rb" "file paths must survive adaptation unchanged"
+	assert_not_contains "${content}" "srcgrepika-index.ts" "src/index.ts must never be corrupted into srcgrepika-index.ts"
+	assert_not_contains "${content}" "docsindex-status.md" "docs/index-status.md must never be corrupted"
+	assert_not_contains "${content}" "libapply-pattern.rb" "lib/apply-pattern.rb must never be corrupted"
+	assert_not_contains "${content}" "specstudy.rb" "spec/study.rb must never be corrupted"
+}
+
+test_grepika_skills_install_runs_after_other_installers_before_personal_skills() {
+	# Integration test: exercises the real install-grepika-skills script
+	# end to end (mocked network clone) as part of the full install, and
+	# verifies both ordering (item 2: after other external installers,
+	# before personal AI skills so they stay authoritative) and that the
+	# installed skill content was actually adapted for Copilot, not just
+	# copied verbatim.
+	local home_dir output status=0
+	home_dir="$(fresh_home "grepika-ordering")"
+	output="$(run_install "${home_dir}")" || status=$?
+
+	assert_equals "${status}" "0"
+	assert_contains "${output}" "Optional step succeeded: grepika skills"
+
+	local skill_file="${home_dir}/.copilot/skills/example-grepika-skill/SKILL.md"
+	assert_file_exists "${skill_file}"
+	local skill_content
+	skill_content="$(cat "${skill_file}")"
+	assert_not_contains "${skill_content}" "mcp__grepika__" "installed skill must be adapted, not raw upstream content"
+	assert_contains "${skill_content}" "src/index.ts and docs/index-status.md" "installed skill file paths must remain unchanged"
+
+	# Ordering: grepika skills must run after the other Codespaces optional
+	# installers, but before personal AI skills sync/install.
+	local step_order
+	step_order="$(echo "${output}" | grep '^\[dotfiles\] Optional step: ')"
+	local grepika_line copilot_plugin_line personal_sync_line
+	grepika_line="$(echo "${step_order}" | grep -n 'grepika skills' | cut -d: -f1)"
+	copilot_plugin_line="$(echo "${step_order}" | grep -n 'Copilot coder plugin' | cut -d: -f1)"
+	personal_sync_line="$(echo "${step_order}" | grep -n 'Personal AI skills sync' | cut -d: -f1)"
+
+	if [[ "${grepika_line}" -le "${copilot_plugin_line}" ]]; then
+		fail "grepika skills must run after Copilot coder plugin (grepika at line ${grepika_line}, plugin at ${copilot_plugin_line})"
+	fi
+	if [[ "${grepika_line}" -ge "${personal_sync_line}" ]]; then
+		fail "grepika skills must run before Personal AI skills sync (grepika at line ${grepika_line}, personal sync at ${personal_sync_line})"
+	fi
+}
+
+test_grepika_skills_clone_does_not_need_gh_auth() {
+	# agentika-labs/grepika is public: install-grepika-skills clones it
+	# with plain `git clone` over HTTPS, never `gh`, so it must succeed
+	# even when GitHub CLI auth/clone is broken (item 6/7).
+	local home_dir output status=0
+	home_dir="$(fresh_home "grepika-without-gh-auth")"
+	output="$(run_install "${home_dir}" MOCK_GH_CLONE_FAIL=1 MOCK_GH_EXTENSION_FAIL=1)" || status=$?
+
+	assert_equals "${status}" "0"
+	assert_contains "${output}" "Optional step succeeded: grepika skills"
+	assert_file_exists "${home_dir}/.copilot/skills/example-grepika-skill/SKILL.md"
+	assert_not_contains "${output}" "optional step failed (exit 1): grepika skills" "grepika skills step itself must not be affected by unrelated gh auth/extension failures"
+}
+
 # --- run all tests -----------------------------------------------------
 
 mkdir -p "${SCRATCH_ROOT}"
@@ -323,6 +429,9 @@ run_test test_personal_ai_skills_install_last_and_present
 run_test test_personal_ai_skills_clone_does_not_need_gh_auth
 run_test test_plugin_update_failure_preserves_existing_install
 run_test test_second_run_is_idempotent
+run_test test_grepika_skill_adaptation_preserves_paths_and_adapts_commands
+run_test test_grepika_skills_install_runs_after_other_installers_before_personal_skills
+run_test test_grepika_skills_clone_does_not_need_gh_auth
 
 rm -rf -- "${SCRATCH_ROOT}"
 
