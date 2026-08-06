@@ -1,0 +1,68 @@
+#!/usr/bin/env bash
+# Test mock for the GitHub CLI. Supports just the subcommands exercised by
+# install / install-agent-skills, each independently failable via env vars
+# so tests can exercise "optional step fails, install continues".
+set -euo pipefail
+
+sub1="${1:-}"
+sub2="${2:-}"
+
+case "${sub1}" in
+	repo)
+		if [[ "${sub2}" == "clone" ]]; then
+			repo="${3:-}"
+			target="${4:-}"
+			if [[ "${MOCK_GH_CLONE_FAIL:-0}" == "1" ]]; then
+				echo "[mock-gh] simulated 'repo clone' failure for ${repo}" >&2
+				exit 1
+			fi
+			mkdir -p "${target}/.git"
+			echo "ref: refs/heads/main" > "${target}/.git/HEAD"
+			# Minimal stand-in for JasonMore/ai-skills's own installer, used to
+			# verify personal skills install ordering/presence in tests.
+			cat > "${target}/install" <<INSTALL_EOF
+#!/usr/bin/env bash
+set -euo pipefail
+echo "[mock-ai-skills] install ran for ${repo}"
+mkdir -p "\$(dirname "\$0")/.marker"
+date +%s > "\$(dirname "\$0")/.marker/personal-ai-skills-installed"
+INSTALL_EOF
+			chmod +x "${target}/install"
+			echo "[mock-gh] cloned (mocked) ${repo} -> ${target}"
+			exit 0
+		fi
+		;;
+	extension)
+		if [[ "${sub2}" == "install" ]]; then
+			if [[ "${MOCK_GH_EXTENSION_FAIL:-0}" == "1" ]]; then
+				echo "[mock-gh] simulated extension install failure" >&2
+				exit 1
+			fi
+			echo "[mock-gh] extension install ${3:-}"
+			exit 0
+		fi
+		;;
+	stack)
+		if [[ "${sub2}" == "alias" ]]; then
+			if [[ "${MOCK_GH_STACK_ALIAS_FAIL:-0}" == "1" ]]; then
+				echo "[mock-gh] simulated stack alias failure" >&2
+				exit 1
+			fi
+			echo "[mock-gh] stack alias"
+			exit 0
+		fi
+		;;
+	hubber-skills)
+		if [[ "${sub2}" == "install" ]]; then
+			if [[ "${MOCK_GH_HUBBER_SKILLS_FAIL:-0}" == "1" ]]; then
+				echo "[mock-gh] simulated hubber-skills install failure" >&2
+				exit 1
+			fi
+			echo "[mock-gh] hubber-skills install ${3:-}"
+			exit 0
+		fi
+		;;
+esac
+
+echo "[mock-gh] unhandled invocation: $*" >&2
+exit 1

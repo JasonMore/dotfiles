@@ -18,20 +18,15 @@ jobs:
       - name: Validate shell scripts syntax
         run: |
           echo "Validating bash scripts..."
-          
-          # Check install script
-          if ! bash -n install; then
-            echo "❌ install script has syntax errors"
-            exit 1
-          fi
-          echo "✅ install script syntax is valid"
-          
-          # Check install-agent-skills script
-          if ! bash -n install-agent-skills; then
-            echo "❌ install-agent-skills script has syntax errors"
-            exit 1
-          fi
-          echo "✅ install-agent-skills script syntax is valid"
+
+          scripts=(install install-agent-skills install-caveman-skills install-copilot-plugin workspace.sh tests/run_tests.sh tests/mocks/bin/sudo tests/mocks/bin/chsh tests/mocks/bin/git tests/mocks/bin/gh tests/mocks/bin/npx tests/mocks/bin/curl)
+          for script in "${scripts[@]}"; do
+            if ! bash -n "$script"; then
+              echo "❌ ${script} has syntax errors"
+              exit 1
+            fi
+            echo "✅ ${script} syntax is valid"
+          done
 
       - name: Validate zsh configuration
         run: |
@@ -65,13 +60,15 @@ jobs:
       - name: Check file permissions
         run: |
           echo "Checking executable permissions..."
-          
-          if [[ ! -x "install-agent-skills" ]]; then
-            echo "❌ install-agent-skills should be executable"
-            exit 1
-          fi
-          echo "✅ install-agent-skills is executable"
-          
+
+          for script in install install-agent-skills install-caveman-skills install-copilot-plugin workspace.sh tests/run_tests.sh tests/mocks/bin/sudo tests/mocks/bin/chsh tests/mocks/bin/git tests/mocks/bin/gh tests/mocks/bin/npx tests/mocks/bin/curl; do
+            if [[ ! -x "$script" ]]; then
+              echo "❌ ${script} should be executable"
+              exit 1
+            fi
+            echo "✅ ${script} is executable"
+          done
+
           if [[ -x ".zshrc" ]]; then
             echo "❌ .zshrc should NOT be executable"
             exit 1
@@ -96,7 +93,7 @@ jobs:
           fi
           
           # Check for proper shell options in scripts
-          for script in install install-agent-skills; do
+          for script in install install-agent-skills install-caveman-skills install-copilot-plugin; do
             if ! grep -q "set -e" "$script"; then
               echo "⚠️  Warning: $script doesn't use 'set -e' for error handling"
             fi
@@ -136,6 +133,14 @@ jobs:
           
           echo "✅ install script dry run passed"
 
+      - name: Run behavioral installer tests
+        run: |
+          echo "Installing jq (required by install's MCP/Ruby LSP config steps)..."
+          sudo apt-get install -y -qq jq
+
+          echo "Running tests/run_tests.sh (isolated \$HOME, mocked PATH, no real network/system/account changes)..."
+          bash tests/run_tests.sh
+
       - name: Summary
         if: always()
         run: |
@@ -146,3 +151,4 @@ jobs:
           echo "Shell syntax validated ✓"
           echo "Permissions checked ✓"
           echo "Security checks passed ✓"
+          echo "Behavioral installer tests passed ✓"

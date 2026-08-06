@@ -19,9 +19,8 @@ if [[ -d "${COPILOT_PLUGINS_DIR}/copilot-coder-plugin" ]]; then
         echo "[copilot-plugin] Plugin updated successfully"
         exit 0
     else
-        echo "[copilot-plugin] Warning: Update failed, will try fresh install"
-        cd -
-        rm -rf "${COPILOT_PLUGINS_DIR}/copilot-coder-plugin"
+        echo "[copilot-plugin] Warning: Update failed; keeping existing plugin"
+        exit 1
     fi
 fi
 
