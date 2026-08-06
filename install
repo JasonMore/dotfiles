@@ -227,6 +227,10 @@ if [[ -n "${CODESPACES:-}" ]]; then
 	# value) rather than aborting the whole install.
 
 	install_atuin_optional() {
+		# Pick up an existing install even when non-VS Code shells omit Atuin
+		# from PATH, such as `gh codespace ssh` sessions.
+		# shellcheck disable=SC1090
+		[[ -f "${HOME}/.atuin/bin/env" ]] && source "${HOME}/.atuin/bin/env"
 		if command -v atuin >/dev/null 2>&1; then
 			echo "[dotfiles] Atuin already installed"
 			return 0
@@ -290,7 +294,7 @@ if [[ -n "${CODESPACES:-}" ]]; then
 		gh stack alias
 	}
 	install_gh_stack_skill() {
-		npx skills add github/gh-stack
+		npx skills add github/gh-stack --yes --global
 	}
 
 	run_optional_step "gh-stack extension" install_gh_stack_extension

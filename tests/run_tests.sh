@@ -163,6 +163,26 @@ test_atuin_network_failure_does_not_abort_install() {
 	assert_file_exists "${home_dir}/.copilot/ai-skills/.marker/personal-ai-skills-installed"
 }
 
+test_existing_atuin_outside_path_is_reused() {
+	local home_dir output status=0
+	home_dir="$(fresh_home "existing-atuin-outside-path")"
+	mkdir -p "${home_dir}/.atuin/bin"
+	cat > "${home_dir}/.atuin/bin/atuin" <<'ATUIN_EOF'
+#!/usr/bin/env bash
+exit 0
+ATUIN_EOF
+	chmod +x "${home_dir}/.atuin/bin/atuin"
+	cat > "${home_dir}/.atuin/bin/env" <<ATUIN_ENV_EOF
+export PATH="${home_dir}/.atuin/bin:\${PATH}"
+ATUIN_ENV_EOF
+
+	output="$(run_install "${home_dir}" MOCK_CURL_ATUIN_FAIL=1)" || status=$?
+
+	assert_equals "${status}" "0"
+	assert_contains "${output}" "Atuin already installed"
+	assert_not_contains "${output}" "optional step failed (exit 1): Atuin install"
+}
+
 test_optional_failures_continue_to_later_steps() {
 	# gh-stack extension install fails; every later optional step (aliases,
 	# skill, caveman, copilot plugin, personal ai-skills) must still run.
@@ -184,6 +204,15 @@ test_optional_failures_continue_to_later_steps() {
 	assert_contains "${output}" "Optional step succeeded: Personal AI skills install"
 	assert_contains "${output}" "Install finished with 2 optional step(s) needing attention"
 	assert_contains "${output}" "gh-stack extension (exit 1)"
+}
+
+test_gh_stack_skill_install_is_noninteractive_and_global() {
+	local home_dir output status=0
+	home_dir="$(fresh_home "gh-stack-skill-flags")"
+	output="$(run_install "${home_dir}")" || status=$?
+
+	assert_equals "${status}" "0"
+	assert_contains "${output}" "[mock-npx] skills add github/gh-stack --yes --global"
 }
 
 test_core_dotfile_links_are_created() {
@@ -235,6 +264,27 @@ test_personal_ai_skills_clone_does_not_need_gh_auth() {
 	assert_not_contains "${output}" "simulated 'repo clone' failure"
 }
 
+test_plugin_update_failure_preserves_existing_install() {
+	local home_dir plugin_dir output status=0
+	home_dir="$(fresh_home "plugin-update-preserves-existing")"
+	plugin_dir="${home_dir}/.copilot/plugins/copilot-coder-plugin"
+	mkdir -p "${plugin_dir}/.git"
+	echo "keep-me" > "${plugin_dir}/sentinel"
+
+	output="$(
+		env -i \
+			HOME="${home_dir}" \
+			PATH="${MOCK_BIN}:${SAFE_PATH}" \
+			REAL_GIT="${REAL_GIT}" \
+			MOCK_GIT_PULL_FAIL=1 \
+			bash "${REPO_DIR}/install-copilot-plugin" 2>&1
+	)" || status=$?
+
+	assert_equals "${status}" "1"
+	assert_contains "${output}" "Update failed; keeping existing plugin"
+	assert_file_exists "${plugin_dir}/sentinel"
+}
+
 test_second_run_is_idempotent() {
 	local home_dir first_output second_output first_status=0 second_status=0
 	home_dir="$(fresh_home "idempotent-rerun")"
@@ -265,10 +315,13 @@ mkdir -p "${SCRATCH_ROOT}"
 run_test test_missing_atuin_secrets_warns_and_continues
 run_test test_partial_atuin_secrets_reports_only_missing_vars
 run_test test_atuin_network_failure_does_not_abort_install
+run_test test_existing_atuin_outside_path_is_reused
 run_test test_optional_failures_continue_to_later_steps
+run_test test_gh_stack_skill_install_is_noninteractive_and_global
 run_test test_core_dotfile_links_are_created
 run_test test_personal_ai_skills_install_last_and_present
 run_test test_personal_ai_skills_clone_does_not_need_gh_auth
+run_test test_plugin_update_failure_preserves_existing_install
 run_test test_second_run_is_idempotent
 
 rm -rf -- "${SCRATCH_ROOT}"
