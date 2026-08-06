@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+# Test mock: no real account/shell change. Records the call for assertions.
+set -euo pipefail
+echo "[mock-chsh] called with: $*"
+exit 0
