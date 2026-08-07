@@ -37,9 +37,15 @@ ATUIN_SCRIPT
 export PATH="${HOME}/.atuin/bin:${PATH}"
 ENV_SCRIPT
 
-	# This output becomes `sh`'s stdin in `curl ... | sh`; a comment is a
-	# harmless no-op since the real work above already happened.
-	echo "# mock atuin install complete"
+	# This output becomes sh's stdin. Require the non-interactive argument
+	# that avoids setup.atuin.sh's /dev/tty probe in Codespaces creation.
+	cat <<'INSTALL_SCRIPT'
+if [ "${1:-}" != "--non-interactive" ]; then
+	echo "missing --non-interactive" >&2
+	exit 42
+fi
+touch "${HOME}/.atuin/non-interactive-install"
+INSTALL_SCRIPT
 	exit 0
 fi
 

@@ -139,6 +139,17 @@ test_missing_atuin_secrets_warns_and_continues() {
 	assert_contains "${output}" "Install complete; all steps succeeded."
 }
 
+test_atuin_install_is_noninteractive() {
+	local home_dir output status=0
+	home_dir="$(fresh_home "atuin-non-interactive")"
+	output="$(run_install "${home_dir}")" || status=$?
+
+	assert_equals "${status}" "0"
+	assert_file_exists "${home_dir}/.atuin/non-interactive-install"
+	assert_not_contains "${output}" "missing --non-interactive"
+	assert_contains "${output}" "Optional step succeeded: Atuin install"
+}
+
 test_partial_atuin_secrets_reports_only_missing_vars() {
 	local home_dir output status=0
 	home_dir="$(fresh_home "partial-atuin-secrets")"
@@ -419,6 +430,7 @@ test_grepika_skills_clone_does_not_need_gh_auth() {
 mkdir -p "${SCRATCH_ROOT}"
 
 run_test test_missing_atuin_secrets_warns_and_continues
+run_test test_atuin_install_is_noninteractive
 run_test test_partial_atuin_secrets_reports_only_missing_vars
 run_test test_atuin_network_failure_does_not_abort_install
 run_test test_existing_atuin_outside_path_is_reused
