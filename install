@@ -50,6 +50,82 @@ safe_rm_rf() {
 	rm -rf -- "${target}"
 }
 
+DOTFILES_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+link_copilot_instructions() {
+	echo "[dotfiles] Linking Copilot instructions"
+	mkdir -p "${HOME}/.copilot"
+	if [[ -f "${DOTFILES_DIR}/.copilot/copilot-instructions.md" ]]; then
+		ln -sf "${DOTFILES_DIR}/.copilot/copilot-instructions.md" "${HOME}/.copilot/copilot-instructions.md"
+		echo "[dotfiles] Linked copilot-instructions.md"
+	else
+		echo "[dotfiles] Warning: .copilot/copilot-instructions.md not found, skipping"
+	fi
+}
+
+link_copilot_mcp_config() {
+	echo "[dotfiles] Linking Copilot MCP config"
+	mkdir -p "${HOME}/.copilot"
+	if [[ -f "${DOTFILES_DIR}/.copilot/mcp-config.json" ]]; then
+		ln -sf "${DOTFILES_DIR}/.copilot/mcp-config.json" "${HOME}/.copilot/mcp-config.json"
+		echo "[dotfiles] Linked mcp-config.json"
+	else
+		echo "[dotfiles] Warning: .copilot/mcp-config.json not found, skipping"
+	fi
+}
+
+# link_opencode_agents: symlink OpenCode's AGENTS.md to the dotfiles source.
+# - Existing correct symlink: no-op.
+# - Existing symlink pointing elsewhere: replaced.
+# - Existing regular file with content identical to the source: replaced
+#   without a backup (nothing would be lost).
+# - Existing regular file that differs from the source: backed up to
+#   AGENTS.md.pre-dotfiles-backup before linking.
+# - A backup already exists and the target still differs: error out rather
+#   than overwrite the backup.
+link_opencode_agents() {
+	local source="${DOTFILES_DIR}/.config/opencode/AGENTS.md"
+	local target="${HOME}/.config/opencode/AGENTS.md"
+	local backup="${target}.pre-dotfiles-backup"
+
+	if [[ ! -f "${source}" ]]; then
+		echo "[dotfiles] Error: ${source} not found"
+		return 1
+	fi
+
+	mkdir -p "${HOME}/.config/opencode"
+	if [[ -L "${target}" && "$(readlink "${target}")" == "${source}" ]]; then
+		echo "[dotfiles] opencode AGENTS.md already linked"
+		return 0
+	fi
+	if [[ -L "${target}" ]]; then
+		rm -f -- "${target}"
+	elif [[ -e "${target}" ]]; then
+		if cmp -s "${target}" "${source}"; then
+			echo "[dotfiles] Existing opencode AGENTS.md content matches dotfiles source; replacing with symlink"
+			rm -f -- "${target}"
+		elif [[ -e "${backup}" || -L "${backup}" ]]; then
+			echo "[dotfiles] Error: ${target} exists and backup already exists at ${backup}"
+			return 1
+		else
+			mv "${target}" "${backup}"
+			echo "[dotfiles] Backed up existing opencode AGENTS.md to ${backup}"
+		fi
+	fi
+	ln -s "${source}" "${target}"
+	echo "[dotfiles] Linked opencode AGENTS.md"
+}
+
+# DOTFILES_INSTRUCTIONS_ONLY: focused mode that links only the local
+# instruction surfaces (Copilot instructions + OpenCode AGENTS.md), skipping
+# MCP config and the rest of the install (no git config, tmux, workspace
+# script, Codespaces setup, or optional steps).
+if [[ "${DOTFILES_INSTRUCTIONS_ONLY:-}" == "1" ]]; then
+	link_copilot_instructions
+	link_opencode_agents
+	exit 0
+fi
+
 # --- CORE: strict, must succeed --------------------------------------------
 
 # Codespaces uses zsh at /usr/bin/zsh; skip on local (e.g. macOS) where that path/chsh differs
@@ -64,7 +140,6 @@ git config --global pull.rebase false
 
 # Configure global gitignore to exclude .idea folders
 echo "[dotfiles] Setting up global gitignore"
-DOTFILES_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 git config --global core.excludesfile "${DOTFILES_DIR}/.gitignore_global"
 
 migrate_legacy_mcp_config() {
@@ -121,23 +196,12 @@ echo "[dotfiles] Installing workspace script"
 mkdir -p "${HOME}/.local/bin"
 ln -sf "${DOTFILES_DIR}/workspace.sh" "${HOME}/.local/bin/workspace.sh"
 
-# Copilot instructions + MCP config
+# Copilot instructions + MCP config, and OpenCode AGENTS.md
 # Symlinked (not copied) so the dotfiles repo stays the source of truth and
 # local + Codespaces always reflect the latest repo contents. Runs in both envs.
-echo "[dotfiles] Linking Copilot instructions and MCP config"
-mkdir -p "${HOME}/.copilot"
-if [[ -f "${DOTFILES_DIR}/.copilot/copilot-instructions.md" ]]; then
-	ln -sf "${DOTFILES_DIR}/.copilot/copilot-instructions.md" "${HOME}/.copilot/copilot-instructions.md"
-	echo "[dotfiles] Linked copilot-instructions.md"
-else
-	echo "[dotfiles] Warning: .copilot/copilot-instructions.md not found, skipping"
-fi
-if [[ -f "${DOTFILES_DIR}/.copilot/mcp-config.json" ]]; then
-	ln -sf "${DOTFILES_DIR}/.copilot/mcp-config.json" "${HOME}/.copilot/mcp-config.json"
-	echo "[dotfiles] Linked mcp-config.json"
-else
-	echo "[dotfiles] Warning: .copilot/mcp-config.json not found, skipping"
-fi
+link_copilot_instructions
+link_copilot_mcp_config
+link_opencode_agents
 
 # --- OPTIONAL: personal AI skills (defined here, run last) -----------------
 
