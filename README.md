@@ -3,14 +3,15 @@ dotfile
 Includes a `workspace` helper (see `workspace.sh`) that creates a git worktree in a sibling `*-worktrees/` directory and opens it in a new VS Code window.
 Codespaces install flow also migrates legacy `.vscode/mcp.json` files to `.mcp.json` for Copilot CLI compatibility.
 Installs a macOS `copilot-notify` launchd daemon (see `.copilot/bin/copilot-notify.sh`) that fires push notifications when local, Codespace, or cloud Copilot agent sessions finish or need input.
-Clones `JasonMore/ai-skills` (Jason-authored skills only, never grepika) and runs its installer so personal Copilot skills persist across Codespaces. Personal AI skills always install last, so they win any same-name skill conflicts with other installers (e.g. `install-agent-skills`, `install-caveman-skills`, `install-grepika-skills`).
+Clones `JasonMore/ai-skills` (Jason-authored skills only, never grepika) and runs its installer so personal Copilot skills persist across Codespaces. Personal AI skills always install last, so they win any same-name skill conflicts with other installers (e.g. Impeccable, `install-agent-skills`, `install-caveman-skills`, `install-grepika-skills`).
 `.copilot/mcp-config.json` is symlinked to `~/.copilot/mcp-config.json` and registers global MCP servers for Copilot Desktop/CLI, including `grepika` (`npx -y @agentika/grepika@latest --mcp`) for token-efficient code search.
 Codespaces setup also runs `install-grepika-skills`, which freshly installs the grepika skills (`plugins/grepika/skills/*`) directly from upstream `agentika-labs/grepika` into `~/.copilot/skills` on every run. This runs after the other Codespaces skill installers (so it wins any name collisions with them) but before the final `JasonMore/ai-skills` install.
+It also installs `pbakaus/impeccable` skills globally and noninteractively with `npx skills add pbakaus/impeccable --yes --global`.
 
 ## Reliability model
 
 `install` is split into strict **core** steps (local symlinks/config; abort on
-failure) and **optional** integrations (Atuin, agent skills, gh-stack,
+failure) and **optional** integrations (Atuin, agent skills, gh-stack, Impeccable,
 caveman, Copilot coder plugin, grepika skills, personal AI skills). Optional
 steps run through a named runner that logs the exact failed step and exit
 status, then continues; a missing secret, network hiccup, or external

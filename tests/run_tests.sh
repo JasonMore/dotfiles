@@ -209,6 +209,7 @@ test_optional_failures_continue_to_later_steps() {
 	assert_contains "${output}" "optional step failed (exit 1): gh-stack extension"
 	assert_contains "${output}" "Optional step succeeded: gh-stack aliases"
 	assert_contains "${output}" "Optional step succeeded: gh-stack skill"
+	assert_contains "${output}" "Optional step succeeded: Impeccable skills"
 	assert_contains "${output}" "Optional step succeeded: Caveman skills"
 	assert_contains "${output}" "Optional step succeeded: Copilot coder plugin"
 	assert_contains "${output}" "Optional step succeeded: Personal AI skills sync"
@@ -224,6 +225,16 @@ test_gh_stack_skill_install_is_noninteractive_and_global() {
 
 	assert_equals "${status}" "0"
 	assert_contains "${output}" "[mock-npx] skills add github/gh-stack --yes --global"
+}
+
+test_impeccable_skills_install_is_noninteractive_and_global() {
+	local home_dir output status=0
+	home_dir="$(fresh_home "impeccable-skill-flags")"
+	output="$(run_install "${home_dir}")" || status=$?
+
+	assert_equals "${status}" "0"
+	assert_contains "${output}" "[mock-npx] skills add pbakaus/impeccable --yes --global"
+	assert_contains "${output}" "Optional step succeeded: Impeccable skills"
 }
 
 test_core_dotfile_links_are_created() {
@@ -436,6 +447,7 @@ run_test test_atuin_network_failure_does_not_abort_install
 run_test test_existing_atuin_outside_path_is_reused
 run_test test_optional_failures_continue_to_later_steps
 run_test test_gh_stack_skill_install_is_noninteractive_and_global
+run_test test_impeccable_skills_install_is_noninteractive_and_global
 run_test test_core_dotfile_links_are_created
 run_test test_personal_ai_skills_install_last_and_present
 run_test test_personal_ai_skills_clone_does_not_need_gh_auth
