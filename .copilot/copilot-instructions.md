@@ -12,6 +12,7 @@
 - **REQUIRED:** Any time you comment as me on a PR or issue, prepend the message with `[from copilot-cli]`.
 
 ## Writing code
+- If you think I changed the code, do not change it back. Assume I wrote the correct code and update your understanding.
 - Use a focused coding subagent for non-trivial code changes, broad refactors, unfamiliar areas, or multi-file behavior changes.
 - Do not delegate trivial edits, mechanical fixes, docs-only changes, or changes that can be safely completed directly.
 - **Model selection (use judgement).** For medium-to-large delegated tasks, prefer a lower-cost model of the same family and version (5.6 sol -> 5.6 terra) to preserve the primary session's context window and budget. Escalate to a higher-cost model only when the work needs hard reasoning: tricky bugs, non-obvious architecture, ambiguous requirements, or changes spanning multiple systems.
@@ -72,34 +73,3 @@ Use these rules when creating or refactoring React features.
 - Use `select` to subscribe a component only to the data it actually renders. A change to any other part of the query data will not re-render that component.
 - Select the narrowest value, not the whole object. If a row only needs a count, select the count: `select: d => ({ commitsCount: d.summary.commits?.count })`.
 - Centralize query config in a `queryOptions()` factory hook that accepts caller `options`. Spread `options` first so explicit `queryKey`, `enabled`, and `queryFn` cannot be overridden.
-- Pass `select` through the factory to the consuming `useSuspenseQuery`/`useQuery` call.
-- Drop thin `useSuspenseX` wrapper hooks that add no logic. Call the factory directly: `useSuspenseQuery(useXQueryOptions({ select }))`.
-
-```tsx
-// Query factory: accepts caller options, protects the essentials.
-function useActivityQueryOptions(options) {
-  const {effectiveSelection, lastActivityTimestamp} = useEffectiveSelection()
-  const queryKey = [PageData.activity, effectiveSelection?.timestamp, lastActivityTimestamp] as const
-  const apiURL = usePageDataUrl(PageData.activity, `since=${effectiveSelection?.timestamp ?? ''}`)
-
-  return queryOptions({
-    ...options, // spread first so queryKey/enabled/queryFn below win
-    queryKey,
-    enabled: !!effectiveSelection,
-    queryFn: () => fetchActivityPageData(apiURL),
-    staleTime: Infinity,
-  })
-}
-
-// Component subscribes only to the count it renders.
-export function CommitsRow() {
-  const {data: {commitsCount}} = useSuspenseQuery(useActivityQueryOptions({
-    select: d => ({commitsCount: d.summary.commits?.count}),
-  }))
-  if (!commitsCount) return null
-  const label = `${commitsCount} new ${pluralize(commitsCount, 'commit', 'commits')}`
-  return <SidebarActivityRow icon={GitCommitIcon} label={label} group="commits" expectedCount={commitsCount} />
-}
-```
-
-- Reference: TkDodo, "React Query Selectors, Supercharged" and "The Query Options API: Query Factories".
