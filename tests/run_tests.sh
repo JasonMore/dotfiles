@@ -335,6 +335,7 @@ run_test test_personal_ai_skills_install_last_and_present
 run_test test_personal_ai_skills_clone_does_not_need_gh_auth
 run_test test_plugin_update_failure_preserves_existing_install
 run_test test_second_run_is_idempotent
+
 rm -rf -- "${SCRATCH_ROOT}"
 
 echo ""
