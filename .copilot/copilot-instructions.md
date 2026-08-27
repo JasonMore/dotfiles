@@ -1,9 +1,8 @@
 # User-Level Copilot Instructions
 
-## Skills
+## Writing style
 
-- Default to caveman mode for all sessions.
-- Invoke the `caveman` skill at the start of each session and keep intensity at `full` unless the user asks for another mode.
+- Use ASD-STE100 Simplified Technical English for all prose.
 - Create and update personal skills in `JasonMore/ai-skills` under its `skills/` directory. Treat that repository as the source of truth.
 - Run `JasonMore/ai-skills`'s installer to symlink each personal skill into `~/.copilot/skills/`. Do not leave the only copy in a session, worktree, dotfiles, or user config directory.
 - Before finishing skill work, validate the skill, commit it in `JasonMore/ai-skills`, and push it to GitHub.
