@@ -1,9 +1,8 @@
 # User-Level Copilot Instructions
 
-## Skills
+## Writing style
 
-- Default to caveman mode for all sessions.
-- Invoke the `caveman` skill at the start of each session and keep intensity at `full` unless the user asks for another mode.
+- Use ASD-STE100 Simplified Technical English for all prose.
 
 ## Commenting on PRs and Issues
 - **REQUIRED:** Any time you comment as me on a PR or issue, prepend the message with `[from copilot-cli]`.
