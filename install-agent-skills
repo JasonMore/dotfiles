@@ -6,6 +6,7 @@ echo "[agent-skills] Installing agent skills from github/agent-config repository
 
 # Define directories
 TEMP_DIR=$(mktemp -d)
+trap 'rm -rf -- "${TEMP_DIR}"' EXIT
 SKILLS_REPO="https://github.com/github/agent-config.git"
 TARGET_DIR="${HOME}/.copilot/skills"
 
@@ -14,7 +15,6 @@ echo "[agent-skills] Cloning github/agent-config repository..."
 if ! git clone --depth=1 "${SKILLS_REPO}" "${TEMP_DIR}"; then
     echo "[agent-skills] Error: Failed to clone github/agent-config repository"
     echo "[agent-skills] Please check your network connection and try again"
-    rm -rf "${TEMP_DIR}"
     exit 1
 fi
 
@@ -35,11 +35,10 @@ if [[ -d "${TEMP_DIR}/skills" ]]; then
         if [[ -d "${skill_dir}" ]]; then
             skill_name=$(basename "${skill_dir}")
             echo "[agent-skills]   - Installing: ${skill_name}"
-            rm -rf "${TARGET_DIR}/${skill_name}"
+            rm -rf "${TARGET_DIR:?}/${skill_name:?}"
             if ! cp -r "${skill_dir}" "${TARGET_DIR}/${skill_name}"; then
                 echo "[agent-skills] Error: Failed to copy skill '${skill_name}'"
                 echo "[agent-skills] Please check permissions and disk space"
-                rm -rf "${TEMP_DIR}"
                 exit 1
             fi
         fi
@@ -48,13 +47,12 @@ if [[ -d "${TEMP_DIR}/skills" ]]; then
     echo "[agent-skills] Successfully installed ${SKILL_COUNT} skills"
 else
     echo "[agent-skills] Error: Skills directory not found in cloned repository"
-    rm -rf "${TEMP_DIR}"
     exit 1
 fi
 
-# Clean up temp directory
+# Clean up temp directory (also handled by the EXIT trap; explicit for clarity)
 echo "[agent-skills] Cleaning up temp directory"
-rm -rf "${TEMP_DIR}"
+rm -rf -- "${TEMP_DIR}"
 
 # List installed skills
 echo "[agent-skills] Installed skills:"

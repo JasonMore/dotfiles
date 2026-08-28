@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+# Test mock for npx, used only for `npx skills add github/gh-stack`.
+set -euo pipefail
+if [[ "${MOCK_NPX_FAIL:-0}" == "1" ]]; then
+	echo "[mock-npx] simulated failure for: $*" >&2
+	exit 1
+fi
+echo "[mock-npx] $*"
+exit 0

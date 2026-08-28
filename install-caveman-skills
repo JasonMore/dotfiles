@@ -5,13 +5,13 @@ set -euo pipefail
 echo "[caveman-skills] Installing caveman skills from JuliusBrussee/caveman"
 
 TEMP_DIR=$(mktemp -d)
+trap 'rm -rf -- "${TEMP_DIR}"' EXIT
 SKILLS_REPO="https://github.com/JuliusBrussee/caveman.git"
 TARGET_DIR="${HOME}/.agents/skills"
 
 echo "[caveman-skills] Cloning JuliusBrussee/caveman..."
 if ! git clone --depth=1 "${SKILLS_REPO}" "${TEMP_DIR}"; then
     echo "[caveman-skills] Error: Failed to clone repository"
-    rm -rf "${TEMP_DIR}"
     exit 1
 fi
 
@@ -22,15 +22,12 @@ if [[ -d "${TEMP_DIR}/skills" ]]; then
         if [[ -d "${skill_dir}" ]]; then
             skill_name=$(basename "${skill_dir}")
             echo "[caveman-skills]   - Installing: ${skill_name}"
-            rm -rf "${TARGET_DIR}/${skill_name}"
+            rm -rf "${TARGET_DIR:?}/${skill_name:?}"
             cp -r "${skill_dir}" "${TARGET_DIR}/${skill_name}"
         fi
     done
     echo "[caveman-skills] Done"
 else
     echo "[caveman-skills] Error: skills/ directory not found in repo"
-    rm -rf "${TEMP_DIR}"
     exit 1
 fi
-
-rm -rf "${TEMP_DIR}"

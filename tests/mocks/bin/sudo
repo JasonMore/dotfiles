@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+# Test mock: never actually escalate privileges. Just run the command so
+# downstream mocks (e.g. chsh) can be exercised without touching the system.
+set -euo pipefail
+exec "$@"

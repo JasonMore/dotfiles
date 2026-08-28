@@ -1,0 +1,50 @@
+#!/usr/bin/env bash
+# Test mock: passes through to the real git binary (path supplied via
+# REAL_GIT) for everything except `clone` and `pull`, which are faked so
+# tests never touch the real network. `git config` still runs for real
+# against the test's isolated $HOME so core dotfile behavior is verified.
+set -euo pipefail
+
+if [[ "${1:-}" == "clone" ]]; then
+	args=("$@")
+	last_index=$(( ${#args[@]} - 1 ))
+	target="${args[${last_index}]}"
+
+	if [[ "${MOCK_GIT_CLONE_FAIL:-0}" == "1" ]]; then
+		echo "[mock-git] simulated clone failure for ${target}" >&2
+		exit 1
+	fi
+
+	mkdir -p "${target}/.git" "${target}/skills/example-skill"
+	echo "ref: refs/heads/main" > "${target}/.git/HEAD"
+	echo "# Example skill" > "${target}/skills/example-skill/SKILL.md"
+	if [[ "${args[*]}" == *"JasonMore/ai-skills.git"* ]]; then
+		cat > "${target}/install" <<'INSTALL_EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+echo "[mock-ai-skills] install ran"
+mkdir -p "$(dirname "$0")/.marker"
+date +%s > "$(dirname "$0")/.marker/personal-ai-skills-installed"
+INSTALL_EOF
+		chmod +x "${target}/install"
+	fi
+	echo "[mock-git] cloned (mocked) into ${target}"
+	exit 0
+fi
+
+for arg in "$@"; do
+	if [[ "${arg}" == "pull" ]]; then
+		if [[ "${MOCK_GIT_PULL_FAIL:-0}" == "1" ]]; then
+			echo "[mock-git] simulated pull failure" >&2
+			exit 1
+		fi
+		echo "[mock-git] pull (mocked, no-op)"
+		exit 0
+	fi
+done
+
+if [[ -z "${REAL_GIT:-}" ]]; then
+	echo "[mock-git] REAL_GIT is not set; cannot pass through '$*'" >&2
+	exit 1
+fi
+exec "${REAL_GIT}" "$@"
