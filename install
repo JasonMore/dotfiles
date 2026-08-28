@@ -82,6 +82,34 @@ if [[ -f "${DOTFILES_DIR}/.copilot/copilot-instructions.md" ]]; then
 else
 	echo "[dotfiles] Warning: .copilot/copilot-instructions.md not found, skipping"
 fi
+mkdir -p "${HOME}/.github"
+github_copilot_target="${HOME}/.github/copilot-instructions.md"
+github_copilot_backup="${github_copilot_target}.pre-dotfiles-backup"
+if [[ -f "${DOTFILES_DIR}/.copilot/copilot-instructions.md" ]]; then
+	if [[ -L "${github_copilot_target}" && "$(readlink "${github_copilot_target}")" == "${DOTFILES_DIR}/.copilot/copilot-instructions.md" ]]; then
+		echo "[dotfiles] GitHub copilot-instructions.md already linked"
+	elif [[ -L "${github_copilot_target}" ]]; then
+		rm -f -- "${github_copilot_target}"
+		ln -s "${DOTFILES_DIR}/.copilot/copilot-instructions.md" "${github_copilot_target}"
+		echo "[dotfiles] Linked GitHub copilot-instructions.md"
+	elif [[ -e "${github_copilot_target}" ]]; then
+		if cmp -s "${github_copilot_target}" "${DOTFILES_DIR}/.copilot/copilot-instructions.md"; then
+			rm -f -- "${github_copilot_target}"
+			ln -s "${DOTFILES_DIR}/.copilot/copilot-instructions.md" "${github_copilot_target}"
+			echo "[dotfiles] Linked GitHub copilot-instructions.md"
+		elif [[ -e "${github_copilot_backup}" || -L "${github_copilot_backup}" ]]; then
+			echo "[dotfiles] Error: ${github_copilot_target} exists and backup already exists at ${github_copilot_backup}"
+			exit 1
+		else
+			mv "${github_copilot_target}" "${github_copilot_backup}"
+			ln -s "${DOTFILES_DIR}/.copilot/copilot-instructions.md" "${github_copilot_target}"
+			echo "[dotfiles] Backed up and linked GitHub copilot-instructions.md"
+		fi
+	else
+		ln -s "${DOTFILES_DIR}/.copilot/copilot-instructions.md" "${github_copilot_target}"
+		echo "[dotfiles] Linked GitHub copilot-instructions.md"
+	fi
+fi
 if [[ -f "${DOTFILES_DIR}/.copilot/mcp-config.json" ]]; then
 	ln -sf "${DOTFILES_DIR}/.copilot/mcp-config.json" "${HOME}/.copilot/mcp-config.json"
 	echo "[dotfiles] Linked mcp-config.json"
