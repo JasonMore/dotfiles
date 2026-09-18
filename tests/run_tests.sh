@@ -196,8 +196,7 @@ ATUIN_ENV_EOF
 
 test_optional_failures_continue_to_later_steps() {
 	# gh-stack extension install fails; every later optional step (aliases,
-	# skill, caveman, copilot plugin, i-have-adhd, personal ai-skills) must
-	# still run.
+	# skill, copilot plugin, i-have-adhd, personal ai-skills) must still run.
 	# (Agent skills also uses `gh extension install` internally, so the same
 	# mock flag causes it to fail too -- exercising two independent
 	# failures continuing through to the end in a single run.)
@@ -210,7 +209,6 @@ test_optional_failures_continue_to_later_steps() {
 	assert_contains "${output}" "optional step failed (exit 1): gh-stack extension"
 	assert_contains "${output}" "Optional step succeeded: gh-stack aliases"
 	assert_contains "${output}" "Optional step succeeded: gh-stack skill"
-	assert_contains "${output}" "Optional step succeeded: Caveman skills"
 	assert_contains "${output}" "Optional step succeeded: Copilot coder plugin"
 	assert_contains "${output}" "Optional step succeeded: i-have-adhd skill"
 	assert_contains "${output}" "Optional step succeeded: Personal AI skills sync"
@@ -249,6 +247,7 @@ test_core_dotfile_links_are_created() {
 	assert_symlink_to "${home_dir}/.copilot/copilot-instructions.md" "${REPO_DIR}/.copilot/copilot-instructions.md"
 	assert_symlink_to "${home_dir}/.copilot/mcp-config.json" "${REPO_DIR}/.copilot/mcp-config.json"
 	assert_symlink_to "${home_dir}/.zshrc" "${REPO_DIR}/.zshrc"
+	assert_contains "$(cat "${home_dir}/.copilot/copilot-instructions.md")" "## ADHD output style (always on)"
 
 	if ! grep -q "autoSetupRemote" "${home_dir}/.gitconfig" 2>/dev/null; then
 		fail "expected autoSetupRemote setting in ${home_dir}/.gitconfig"

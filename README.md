@@ -3,14 +3,15 @@ dotfile
 Includes a `workspace` helper (see `workspace.sh`) that creates a git worktree in a sibling `*-worktrees/` directory and opens it in a new VS Code window.
 Codespaces install flow also migrates legacy `.vscode/mcp.json` files to `.mcp.json` for Copilot CLI compatibility.
 Installs a macOS `copilot-notify` launchd daemon (see `.copilot/bin/copilot-notify.sh`) that fires push notifications when local, Codespace, or cloud Copilot agent sessions finish or need input.
-Clones `JasonMore/ai-skills` (Jason-authored skills only) and runs its installer so personal Copilot skills persist across Codespaces. Personal AI skills always install last, so they win any same-name skill conflicts with other installers (e.g. `install-agent-skills`, `install-caveman-skills`).
+Clones `JasonMore/ai-skills` (Jason-authored skills only) and runs its installer so personal Copilot skills persist across Codespaces. Personal AI skills always install last, so they win any same-name skill conflicts with other installers.
+Installs `i-have-adhd` globally and keeps its output rules active through the shared Copilot instructions.
 `.copilot/mcp-config.json` is symlinked to `~/.copilot/mcp-config.json` and registers global MCP servers for Copilot Desktop/CLI.
 
 ## Reliability model
 
 `install` is split into strict **core** steps (local symlinks/config; abort on
 failure) and **optional** integrations (Atuin, agent skills, gh-stack,
-caveman, Copilot coder plugin, i-have-adhd, personal AI skills). Optional
+Copilot coder plugin, i-have-adhd, personal AI skills). Optional
 steps run through a named runner that logs the exact failed step and exit
 status, then continues; a missing secret, network hiccup, or external
 installer failure never blocks the rest of the install. Personal AI skills

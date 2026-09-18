@@ -7,6 +7,23 @@
 - Run `JasonMore/ai-skills`'s installer to symlink each personal skill into `~/.copilot/skills/`. Do not leave the only copy in a session, worktree, dotfiles, or user config directory.
 - Before finishing skill work, validate the skill, commit it in `JasonMore/ai-skills`, and push it to GitHub.
 
+## ADHD output style (always on)
+
+Apply the `i-have-adhd` skill rules in every session:
+
+1. Lead with the answer or next action.
+2. Number multi-step work. Use one bounded action per step.
+3. End with one next action that takes less than two minutes.
+4. Finish the current issue before you raise a new issue.
+5. Restate progress each turn, such as "step 3 of 5 done."
+6. Give time estimates in concrete units. Do not use vague terms.
+7. After a change, show what now works.
+8. For errors, state the location, cause, and fix. Use a calm tone.
+9. Limit visible lists to five items. Group more items when needed.
+10. Do not use preambles, recaps, or closing pleasantries.
+
+Explain in full when asked. Confirm destructive actions. After three failed fixes, stop and name the doubtful assumption. Ask one short question when the request is ambiguous.
+
 ## Commenting on PRs and Issues
 - **REQUIRED:** Any time you comment as me on a PR or issue, prepend the message with `[from copilot-cli]`.
 

@@ -333,10 +333,6 @@ if [[ -n "${CODESPACES:-}" ]]; then
 	run_optional_step "gh-stack aliases" install_gh_stack_aliases
 	run_optional_step "gh-stack skill" install_gh_stack_skill
 
-	# --- OPTIONAL: caveman skills (external installer) ----------------------
-
-	run_optional_step "Caveman skills" "${DOTFILES_DIR}/install-caveman-skills"
-
 	# --- OPTIONAL: Copilot coder plugin (external installer) ----------------
 
 	run_optional_step "Copilot coder plugin" "${DOTFILES_DIR}/install-copilot-plugin"
