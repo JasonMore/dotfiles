@@ -248,6 +248,7 @@ test_core_dotfile_links_are_created() {
 	assert_symlink_to "${home_dir}/.copilot/mcp-config.json" "${REPO_DIR}/.copilot/mcp-config.json"
 	assert_symlink_to "${home_dir}/.zshrc" "${REPO_DIR}/.zshrc"
 	assert_contains "$(cat "${home_dir}/.copilot/copilot-instructions.md")" "## ADHD output style (always on)"
+	assert_contains "$(cat "${home_dir}/.copilot/copilot-instructions.md")" "## Generated artifacts"
 
 	if ! grep -q "autoSetupRemote" "${home_dir}/.gitconfig" 2>/dev/null; then
 		fail "expected autoSetupRemote setting in ${home_dir}/.gitconfig"
