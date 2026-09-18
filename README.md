@@ -10,7 +10,7 @@ Clones `JasonMore/ai-skills` (Jason-authored skills only) and runs its installer
 
 `install` is split into strict **core** steps (local symlinks/config; abort on
 failure) and **optional** integrations (Atuin, agent skills, gh-stack,
-caveman, Copilot coder plugin, personal AI skills). Optional
+caveman, Copilot coder plugin, i-have-adhd, personal AI skills). Optional
 steps run through a named runner that logs the exact failed step and exit
 status, then continues; a missing secret, network hiccup, or external
 installer failure never blocks the rest of the install. Personal AI skills

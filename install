@@ -191,6 +191,10 @@ install_personal_ai_skills_run() {
 	"${ai_skills_dir}/install"
 }
 
+install_i_have_adhd_skill() {
+	npx skills add ayghri/i-have-adhd --agent github-copilot --global --yes
+}
+
 # copilot-notify daemon (macOS only, not Codespaces; uses osascript + launchctl)
 if [[ "$(uname)" == "Darwin" && -z "${CODESPACES:-}" ]]; then
 	echo "[dotfiles] Installing copilot-notify daemon"
@@ -338,6 +342,9 @@ if [[ -n "${CODESPACES:-}" ]]; then
 	run_optional_step "Copilot coder plugin" "${DOTFILES_DIR}/install-copilot-plugin"
 
 fi
+
+# Install the external skill for local and Codespaces Copilot sessions.
+run_optional_step "i-have-adhd skill" install_i_have_adhd_skill
 
 # Install personal skills last so external installers cannot overwrite them.
 # Kept optional (like the other external integrations) so a failure here

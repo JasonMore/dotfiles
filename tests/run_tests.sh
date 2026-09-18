@@ -196,7 +196,8 @@ ATUIN_ENV_EOF
 
 test_optional_failures_continue_to_later_steps() {
 	# gh-stack extension install fails; every later optional step (aliases,
-	# skill, caveman, copilot plugin, personal ai-skills) must still run.
+	# skill, caveman, copilot plugin, i-have-adhd, personal ai-skills) must
+	# still run.
 	# (Agent skills also uses `gh extension install` internally, so the same
 	# mock flag causes it to fail too -- exercising two independent
 	# failures continuing through to the end in a single run.)
@@ -211,6 +212,7 @@ test_optional_failures_continue_to_later_steps() {
 	assert_contains "${output}" "Optional step succeeded: gh-stack skill"
 	assert_contains "${output}" "Optional step succeeded: Caveman skills"
 	assert_contains "${output}" "Optional step succeeded: Copilot coder plugin"
+	assert_contains "${output}" "Optional step succeeded: i-have-adhd skill"
 	assert_contains "${output}" "Optional step succeeded: Personal AI skills sync"
 	assert_contains "${output}" "Optional step succeeded: Personal AI skills install"
 	assert_contains "${output}" "Install finished with 2 optional step(s) needing attention"
@@ -224,6 +226,16 @@ test_gh_stack_skill_install_is_noninteractive_and_global() {
 
 	assert_equals "${status}" "0"
 	assert_contains "${output}" "[mock-npx] skills add github/gh-stack --yes --global"
+}
+
+test_i_have_adhd_skill_install_is_noninteractive_and_global() {
+	local home_dir output status=0
+	home_dir="$(fresh_home "i-have-adhd-skill-flags")"
+	output="$(run_install "${home_dir}")" || status=$?
+
+	assert_equals "${status}" "0"
+	assert_contains "${output}" "[mock-npx] skills add ayghri/i-have-adhd --agent github-copilot --global --yes"
+	assert_contains "${output}" "Optional step succeeded: i-have-adhd skill"
 }
 
 test_core_dotfile_links_are_created() {
@@ -330,6 +342,7 @@ run_test test_atuin_network_failure_does_not_abort_install
 run_test test_existing_atuin_outside_path_is_reused
 run_test test_optional_failures_continue_to_later_steps
 run_test test_gh_stack_skill_install_is_noninteractive_and_global
+run_test test_i_have_adhd_skill_install_is_noninteractive_and_global
 run_test test_core_dotfile_links_are_created
 run_test test_personal_ai_skills_install_last_and_present
 run_test test_personal_ai_skills_clone_does_not_need_gh_auth
