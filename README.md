@@ -94,6 +94,7 @@ over skills with the same name from other sources.
 | Path | Purpose |
 | --- | --- |
 | `install` | Main installer for local systems and Codespaces |
+| `.gitignore_global` | Global Git ignore rules configured by the installer |
 | `.zshrc` | Codespaces zsh configuration and helper functions |
 | `.tmux.conf` | tmux defaults, terminal support, mouse, and clipboard settings |
 | `.copilot/` | Shared Copilot instructions, MCP configuration, skills, and notifications |
