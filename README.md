@@ -16,7 +16,8 @@ The installer always:
 - Links `.tmux.conf` to `~/.tmux.conf`.
 - Installs `workspace.sh` at `~/.local/bin/workspace.sh`.
 - Links the shared Copilot instructions to `~/.copilot/` and `~/.github/`.
-- Links the Playwright MCP configuration to `~/.copilot/mcp-config.json`.
+- Links the global MCP server configuration to `~/.copilot/mcp-config.json`.
+  This configuration currently registers the Playwright MCP server.
 - Installs the global `i-have-adhd` skill and personal skills from
   `JasonMore/ai-skills`.
 
@@ -57,7 +58,8 @@ is usually at:
 ```
 
 This command retries optional steps that failed during initial Codespace
-creation.
+creation. At the end of each run, the installer lists each optional step that
+failed and its exit status.
 
 ## Workspace helper
 
