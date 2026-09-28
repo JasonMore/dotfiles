@@ -50,8 +50,8 @@ network access, GitHub CLI authentication, Node.js with `npx`, `jq`, or platform
 tools such as `launchctl`. The installer reports a warning and continues when an
 optional integration fails.
 
-The installer is designed to be run again. In a Codespace, the persisted clone
-is usually at:
+The installer is designed to be run again. To retry a partial installation from
+a Codespace terminal, run the persisted copy:
 
 ```sh
 /workspaces/.codespaces/.persistedshare/dotfiles/install
