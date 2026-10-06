@@ -30,6 +30,11 @@ Explain in full when asked. Confirm destructive actions. After three failed fixe
 - Prefer `<repo>/tmp/`, then `<repo>/temp/`, then another existing temporary directory that Git ignores.
 - Use `git check-ignore` to confirm the directory is ignored before writing. Do not add the artifact to Git or change `.gitignore` unless the user asks.
 
+## Codespaces
+
+- When `CODESPACES` is set to a non-empty value, use the current repository checkout.
+- Do not use the `workspace` helper or create Git worktrees in a Codespace.
+
 ## Commenting on PRs and Issues
 - **REQUIRED:** Any time you comment as me on a PR or issue, prepend the message with `[from copilot-cli]`.
 

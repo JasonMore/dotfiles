@@ -108,6 +108,6 @@ reset-memup() {
 }
 
 # ============ workspace (git worktree helper) ==========
-if [[ -f "$HOME/.local/bin/workspace.sh" ]]; then
+if [[ -z "${CODESPACES:-}" && -f "$HOME/.local/bin/workspace.sh" ]]; then
   source "$HOME/.local/bin/workspace.sh"
 fi

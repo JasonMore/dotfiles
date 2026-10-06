@@ -117,9 +117,13 @@ echo "[dotfiles] Linking tmux config"
 ln -sf "${DOTFILES_DIR}/.tmux.conf" "${HOME}/.tmux.conf"
 
 # workspace (git worktree helper)
-echo "[dotfiles] Installing workspace script"
-mkdir -p "${HOME}/.local/bin"
-ln -sf "${DOTFILES_DIR}/workspace.sh" "${HOME}/.local/bin/workspace.sh"
+if [[ -z "${CODESPACES:-}" ]]; then
+	echo "[dotfiles] Installing workspace script"
+	mkdir -p "${HOME}/.local/bin"
+	ln -sf "${DOTFILES_DIR}/workspace.sh" "${HOME}/.local/bin/workspace.sh"
+else
+	echo "[dotfiles] Skipping workspace script in Codespaces"
+fi
 
 # Copilot instructions + MCP config
 # Symlinked (not copied) so the dotfiles repo stays the source of truth and

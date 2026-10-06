@@ -5,7 +5,8 @@
 # end, but with:
 #   - an isolated, throwaway $HOME under tests/.scratch/ (never /tmp, never
 #     the real $HOME)
-#   - CODESPACES=1 so the Codespaces-only branch is exercised
+#   - CODESPACES=1 by default, with an empty value for local install tests
+#   - uname reports Linux so local tests cannot load a macOS launch agent
 #   - a PATH pointing at tests/mocks/bin so sudo/chsh/git/gh/npx/curl never
 #     touch the real network, system shell config, or GitHub account
 #
@@ -105,6 +106,7 @@ run_install() {
 		REAL_GIT="${REAL_GIT}" \
 		LOGNAME="${LOGNAME:-tester}" \
 		"$@" \
+		bash -c 'uname() { echo Linux; }; export -f uname; bash "$1"' \
 		bash "${REPO_DIR}/install" 2>&1
 }
 
@@ -243,7 +245,10 @@ test_core_dotfile_links_are_created() {
 
 	assert_equals "${status}" "0"
 	assert_symlink_to "${home_dir}/.tmux.conf" "${REPO_DIR}/.tmux.conf"
-	assert_symlink_to "${home_dir}/.local/bin/workspace.sh" "${REPO_DIR}/workspace.sh"
+	if [[ -e "${home_dir}/.local/bin/workspace.sh" || -L "${home_dir}/.local/bin/workspace.sh" ]]; then
+		fail "Codespaces must not install the workspace helper"
+	fi
+	assert_contains "${output}" "Skipping workspace script in Codespaces"
 	assert_symlink_to "${home_dir}/.copilot/copilot-instructions.md" "${REPO_DIR}/.copilot/copilot-instructions.md"
 	assert_symlink_to "${home_dir}/.copilot/mcp-config.json" "${REPO_DIR}/.copilot/mcp-config.json"
 	assert_symlink_to "${home_dir}/.zshrc" "${REPO_DIR}/.zshrc"
@@ -253,6 +258,47 @@ test_core_dotfile_links_are_created() {
 	if ! grep -q "autoSetupRemote" "${home_dir}/.gitconfig" 2>/dev/null; then
 		fail "expected autoSetupRemote setting in ${home_dir}/.gitconfig"
 	fi
+}
+
+test_local_install_keeps_workspace_helper() {
+	local home_dir output status=0
+	home_dir="$(fresh_home "local-workspace")"
+	output="$(run_install "${home_dir}" CODESPACES=)" || status=$?
+
+	assert_equals "${status}" "0"
+	assert_symlink_to "${home_dir}/.local/bin/workspace.sh" "${REPO_DIR}/workspace.sh"
+	assert_contains "${output}" "Installing workspace script"
+}
+
+test_zsh_loads_workspace_only_locally() {
+	local home_dir output status=0
+	home_dir="$(fresh_home "zsh-workspace")"
+	mkdir -p "${home_dir}/.local/bin"
+	ln -s "${REPO_DIR}/workspace.sh" "${home_dir}/.local/bin/workspace.sh"
+
+	output="$(env -i HOME="${home_dir}" PATH="${SAFE_PATH}" CODESPACES=1 \
+		zsh -fc 'source "$1"; whence -w workspace' zsh "${REPO_DIR}/.zshrc" 2>&1)" || status=$?
+	assert_equals "${status}" "1" "Codespaces must not load an existing workspace helper"
+	assert_not_contains "${output}" "workspace: function"
+
+	status=0
+	output="$(env -i HOME="${home_dir}" PATH="${SAFE_PATH}" \
+		zsh -fc 'source "$1"; whence -w workspace' zsh "${REPO_DIR}/.zshrc" 2>&1)" || status=$?
+	assert_equals "${status}" "0"
+	assert_contains "${output}" "workspace: function"
+}
+
+test_workspace_rejects_codespaces_before_changes() {
+	local argument output status
+	for argument in "" "test-branch" "--list" "--delete"; do
+		status=0
+		output="$(env -i PATH="${SAFE_PATH}" CODESPACES=1 \
+			bash -c 'source "$1"; git() { echo "unexpected git call"; }; code() { echo "unexpected code call"; }; workspace "$2"' \
+			bash "${REPO_DIR}/workspace.sh" "${argument}" 2>&1)" || status=$?
+		assert_equals "${status}" "1"
+		assert_contains "${output}" "workspace is disabled in Codespaces"
+		assert_not_contains "${output}" "unexpected"
+	done
 }
 
 test_personal_ai_skills_install_last_and_present() {
@@ -344,6 +390,9 @@ run_test test_optional_failures_continue_to_later_steps
 run_test test_gh_stack_skill_install_is_noninteractive_and_global
 run_test test_i_have_adhd_skill_install_is_noninteractive_and_global
 run_test test_core_dotfile_links_are_created
+run_test test_local_install_keeps_workspace_helper
+run_test test_zsh_loads_workspace_only_locally
+run_test test_workspace_rejects_codespaces_before_changes
 run_test test_personal_ai_skills_install_last_and_present
 run_test test_personal_ai_skills_clone_does_not_need_gh_auth
 run_test test_plugin_update_failure_preserves_existing_install

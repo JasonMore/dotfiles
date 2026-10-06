@@ -42,6 +42,11 @@ migrate_legacy_mcp_config() {
 }
 
 workspace() {
+    if [[ -n "${CODESPACES:-}" ]]; then
+        echo "Error: workspace is disabled in Codespaces. Use the current repository checkout." >&2
+        return 1
+    fi
+
     # Handle flags
     if [ "$1" = "--list" ]; then
         # Get the git root directory
