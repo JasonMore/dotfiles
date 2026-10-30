@@ -1,0 +1,143 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+MERGIRAF_VERSION="0.20.0"
+mergiraf_bin=""
+download_dir=""
+
+cleanup() {
+	if [[ -n "${download_dir}" ]]; then
+		rm -f -- "${download_dir}/mergiraf.tar.gz" "${download_dir}/mergiraf"
+		rmdir -- "${download_dir}"
+	fi
+}
+trap cleanup EXIT
+
+install_linux_mergiraf() {
+	local architecture checksum url
+
+	architecture="$(uname -m)"
+	case "${architecture}" in
+		x86_64)
+			checksum="fc77469be936b02ab9021b984a3aebc9250a21ae3d264f2ef2198eb8b31b2a7b"
+			;;
+		aarch64 | arm64)
+			architecture="aarch64"
+			checksum="0f153dfa85a799c0d05ee7a21834d049b3595e367ed411a56f007bdb5de8c19d"
+			;;
+		*)
+			echo "[dotfiles] Error: Mergiraf has no configured Linux release for ${architecture}" >&2
+			return 1
+			;;
+	esac
+
+	if ! command -v sha256sum >/dev/null 2>&1; then
+		echo "[dotfiles] Error: sha256sum is required to install Mergiraf" >&2
+		return 1
+	fi
+
+	download_dir="$(mktemp -d "${TMPDIR:-/tmp}/dotfiles-mergiraf.XXXXXX")"
+	url="https://codeberg.org/mergiraf/mergiraf/releases/download/v${MERGIRAF_VERSION}/mergiraf_${architecture}-unknown-linux-musl.tar.gz"
+	echo "[dotfiles] Downloading Mergiraf ${MERGIRAF_VERSION} for ${architecture}"
+	curl --proto '=https' --proto-redir '=https' --tlsv1.2 \
+		--fail --silent --show-error --location --retry 2 \
+		--connect-timeout 15 --max-time 120 \
+		--output "${download_dir}/mergiraf.tar.gz" "${url}"
+
+	if ! printf '%s  %s\n' "${checksum}" "${download_dir}/mergiraf.tar.gz" | sha256sum --check --status; then
+		echo "[dotfiles] Error: Mergiraf archive checksum verification failed" >&2
+		return 1
+	fi
+
+	tar -xzf "${download_dir}/mergiraf.tar.gz" -C "${download_dir}" mergiraf
+	"${download_dir}/mergiraf" --version
+	mkdir -p "${HOME}/.local/bin"
+	if [[ -e "${HOME}/.local/bin/mergiraf" || -L "${HOME}/.local/bin/mergiraf" ]]; then
+		echo "[dotfiles] Error: ${HOME}/.local/bin/mergiraf already exists; not replacing it" >&2
+		return 1
+	fi
+	install -m 755 "${download_dir}/mergiraf" "${HOME}/.local/bin/mergiraf"
+	mergiraf_bin="${HOME}/.local/bin/mergiraf"
+}
+
+if mergiraf_bin="$(type -P mergiraf)"; then
+	echo "[dotfiles] Mergiraf already installed: ${mergiraf_bin}"
+elif [[ -x "${HOME}/.local/bin/mergiraf" ]]; then
+	mergiraf_bin="${HOME}/.local/bin/mergiraf"
+	echo "[dotfiles] Mergiraf already installed: ${mergiraf_bin}"
+elif [[ -e "${HOME}/.local/bin/mergiraf" || -L "${HOME}/.local/bin/mergiraf" ]]; then
+	echo "[dotfiles] Error: ${HOME}/.local/bin/mergiraf exists but is not executable" >&2
+	exit 1
+else
+	case "$(uname -s)" in
+		Darwin)
+			if ! command -v brew >/dev/null 2>&1; then
+				echo "[dotfiles] Error: Homebrew is required to install Mergiraf on macOS" >&2
+				exit 1
+			fi
+			echo "[dotfiles] Installing Mergiraf with Homebrew"
+			HOMEBREW_NO_AUTO_UPDATE=1 HOMEBREW_NO_INSTALL_CLEANUP=1 \
+				HOMEBREW_NO_INSTALL_UPGRADE=1 brew install mergiraf
+			if ! mergiraf_bin="$(type -P mergiraf)"; then
+				echo "[dotfiles] Error: Homebrew did not put mergiraf on PATH" >&2
+				exit 1
+			fi
+			;;
+		Linux)
+			install_linux_mergiraf
+			;;
+		*)
+			echo "[dotfiles] Error: unsupported platform for Mergiraf: $(uname -s)" >&2
+			exit 1
+			;;
+	esac
+fi
+
+if [[ "${mergiraf_bin}" != /* ]]; then
+	mergiraf_bin="$(cd "$(dirname "${mergiraf_bin}")" && pwd -P)/$(basename "${mergiraf_bin}")"
+fi
+"${mergiraf_bin}" --version
+
+set_global_if_unset() {
+	local key="$1" value="$2" status=0
+	git config --global --get "${key}" >/dev/null || status=$?
+	case "${status}" in
+		0) echo "[dotfiles] Keeping existing Git setting: ${key}" ;;
+		1) git config --global "${key}" "${value}" ;;
+		*)
+			echo "[dotfiles] Error: could not read Git setting ${key}" >&2
+			return "${status}"
+			;;
+	esac
+}
+
+printf -v quoted_binary '%q' "${mergiraf_bin}"
+quoted_binary="${quoted_binary//%/%%}"
+driver="${quoted_binary} merge --git %O %A %B -s %S -x %X -y %Y -p %P -l %L"
+set_global_if_unset merge.mergiraf.name mergiraf
+set_global_if_unset merge.mergiraf.driver "${driver}"
+configured_driver="$(git config --global --get merge.mergiraf.driver)"
+if [[ -z "${configured_driver}" ]]; then
+	echo "[dotfiles] Error: existing merge.mergiraf.driver is empty; not enabling it as the default" >&2
+	exit 1
+fi
+set_global_if_unset merge.conflictStyle diff3
+
+config_status=0
+existing_default="$(git config --global --get merge.default)" || config_status=$?
+case "${config_status}" in
+	0)
+		if [[ "${existing_default}" != "mergiraf" ]]; then
+			echo "[dotfiles] Error: existing merge.default '${existing_default}' was not changed; set it to mergiraf to enable automatic merges" >&2
+			exit 1
+		fi
+		;;
+	1) git config --global merge.default mergiraf ;;
+	*)
+		echo "[dotfiles] Error: could not read Git setting merge.default" >&2
+		exit "${config_status}"
+		;;
+esac
+
+echo "[dotfiles] Mergiraf is configured as the default Git merge driver"

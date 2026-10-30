@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if [[ "$*" != "install mergiraf" ]]; then
+	echo "[mock-brew] unexpected command: $*" >&2
+	exit 1
+fi
+if [[ "${HOMEBREW_NO_AUTO_UPDATE:-}" != "1" || "${HOMEBREW_NO_INSTALL_CLEANUP:-}" != "1" || "${HOMEBREW_NO_INSTALL_UPGRADE:-}" != "1" ]]; then
+	echo "[mock-brew] expected unrelated updates and cleanup to be disabled" >&2
+	exit 1
+fi
+if [[ "${MOCK_BREW_MERGIRAF_FAIL:-0}" == "1" ]]; then
+	echo "[mock-brew] simulated Mergiraf install failure" >&2
+	exit 1
+fi
+
+mock_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+mkdir -p "${HOME}/.local/bin"
+cp "${mock_dir}/mergiraf" "${HOME}/.local/bin/mergiraf"
+chmod +x "${HOME}/.local/bin/mergiraf"
+echo "[mock-brew] installed mergiraf"

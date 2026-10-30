@@ -8,6 +8,20 @@ Clones `JasonMore/ai-skills` (Jason-authored skills only) and runs its installer
 Installs `i-have-adhd` globally and keeps its output rules active through the shared Copilot instructions.
 `.copilot/mcp-config.json` is symlinked to `~/.copilot/mcp-config.json` and registers global MCP servers for Copilot Desktop/CLI.
 
+## Mergiraf
+
+The installer adds [Mergiraf](https://mergiraf.org/) with Homebrew on macOS
+and a pinned, checksum-verified 0.20.0 Linux release in Codespaces. Git uses
+Mergiraf for files without an explicit merge attribute, while existing Git
+attributes and merge-driver settings stay in place. If another `merge.default`
+is already set, the installer keeps it and reports that Mergiraf was not
+enabled as the default. Existing conflict styles also stay in place; otherwise,
+Git uses `diff3`, which Mergiraf recommends for manual conflict resolution.
+
+Run `mergiraf review <merge-id>` with the ID printed after an automatic
+resolution. To use Git's normal merge behavior for one command, prefix it
+with `mergiraf=0`.
+
 ## Reliability model
 
 `install` is split into strict **core** steps (local symlinks/config; abort on

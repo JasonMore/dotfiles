@@ -1,14 +1,41 @@
 #!/usr/bin/env bash
-# Test mock for curl. Only the Atuin setup script download is exercised by
-# install; everything else is unexpected in tests and fails loudly.
+# Test mock for the Atuin setup script and Mergiraf release downloads.
+# Everything else is unexpected in tests and fails loudly.
 set -euo pipefail
 
 url=""
+output_path=""
+previous=""
 for arg in "$@"; do
+	if [[ "${previous}" == "--output" ]]; then
+		output_path="${arg}"
+	fi
 	case "${arg}" in
 		http*) url="${arg}" ;;
 	esac
+	previous="${arg}"
 done
+
+if [[ "${url}" == https://codeberg.org/mergiraf/mergiraf/releases/download/* ]]; then
+	if [[ "${MOCK_CURL_MERGIRAF_FAIL:-0}" == "1" ]]; then
+		echo "[mock-curl] simulated Mergiraf download failure" >&2
+		exit 1
+	fi
+	case "${MOCK_UNAME_ARCH:-x86_64}" in
+		x86_64) architecture="x86_64" ;;
+		aarch64 | arm64) architecture="aarch64" ;;
+		*) echo "[mock-curl] unexpected architecture" >&2; exit 1 ;;
+	esac
+	expected_url="https://codeberg.org/mergiraf/mergiraf/releases/download/v0.20.0/mergiraf_${architecture}-unknown-linux-musl.tar.gz"
+	if [[ "${url}" != "${expected_url}" || -z "${output_path}" ]]; then
+		echo "[mock-curl] unexpected Mergiraf release request: $*" >&2
+		exit 1
+	fi
+	mock_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+	tar -czf "${output_path}" -C "${mock_dir}" mergiraf
+	echo "[mock-curl] downloaded Mergiraf for ${architecture}"
+	exit 0
+fi
 
 if [[ "${url}" == *setup.atuin.sh* ]]; then
 	if [[ "${MOCK_CURL_ATUIN_FAIL:-0}" == "1" ]]; then

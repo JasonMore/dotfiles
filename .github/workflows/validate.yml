@@ -19,7 +19,7 @@ jobs:
         run: |
           echo "Validating bash scripts..."
 
-          scripts=(install install-agent-skills install-copilot-plugin workspace.sh tests/run_tests.sh tests/mocks/bin/sudo tests/mocks/bin/chsh tests/mocks/bin/git tests/mocks/bin/gh tests/mocks/bin/npx tests/mocks/bin/curl)
+          scripts=(install install-agent-skills install-copilot-plugin install-mergiraf workspace.sh tests/run_tests.sh tests/mocks/mergiraf tests/mocks/bin/sudo tests/mocks/bin/chsh tests/mocks/bin/git tests/mocks/bin/gh tests/mocks/bin/npx tests/mocks/bin/curl tests/mocks/bin/brew tests/mocks/bin/sha256sum)
           for script in "${scripts[@]}"; do
             if ! bash -n "$script"; then
               echo "❌ ${script} has syntax errors"
@@ -61,7 +61,7 @@ jobs:
         run: |
           echo "Checking executable permissions..."
 
-          for script in install install-agent-skills install-copilot-plugin workspace.sh tests/run_tests.sh tests/mocks/bin/sudo tests/mocks/bin/chsh tests/mocks/bin/git tests/mocks/bin/gh tests/mocks/bin/npx tests/mocks/bin/curl; do
+          for script in install install-agent-skills install-copilot-plugin install-mergiraf workspace.sh tests/run_tests.sh tests/mocks/mergiraf tests/mocks/bin/sudo tests/mocks/bin/chsh tests/mocks/bin/git tests/mocks/bin/gh tests/mocks/bin/npx tests/mocks/bin/curl tests/mocks/bin/brew tests/mocks/bin/sha256sum; do
             if [[ ! -x "$script" ]]; then
               echo "❌ ${script} should be executable"
               exit 1

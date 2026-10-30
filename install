@@ -343,6 +343,9 @@ if [[ -n "${CODESPACES:-}" ]]; then
 
 fi
 
+# Install and configure Mergiraf for local and Codespaces development.
+run_optional_step "Mergiraf" "${DOTFILES_DIR}/install-mergiraf"
+
 # Install the external skill for local and Codespaces Copilot sessions.
 run_optional_step "i-have-adhd skill" install_i_have_adhd_skill
 
