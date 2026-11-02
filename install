@@ -321,6 +321,16 @@ if [[ -n "${CODESPACES:-}" ]]; then
 
 	run_optional_step "Agent skills" "${DOTFILES_DIR}/install-agent-skills"
 
+	install_impeccable_skills() {
+		npx --yes impeccable install --providers=codex --scope=global --no-hooks --yes || return 1
+		if [[ ! -f "${HOME}/.agents/skills/impeccable/SKILL.md" ]]; then
+			echo "[dotfiles] Error: Impeccable skill not found at ${HOME}/.agents/skills/impeccable/SKILL.md" >&2
+			return 1
+		fi
+	}
+
+	run_optional_step "Impeccable skills" install_impeccable_skills
+
 	# --- OPTIONAL: gh-stack (extension, aliases, skill) ---------------------
 
 	install_gh_stack_extension() {

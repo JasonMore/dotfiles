@@ -1,0 +1,73 @@
+{
+  "schema_version": 1,
+  "timezone": "America/Chicago",
+  "generated_at": "2026-07-30T08:00:00-05:00",
+  "events": [
+    {
+      "event_id": "event-david",
+      "title": "Jason / David 1:1",
+      "start": "2026-07-30T10:00:00-05:00",
+      "end": "2026-07-30T10:30:00-05:00",
+      "organizer": {
+        "display_name": "Jason More",
+        "email": "jasonmore"
+      },
+      "attendees": [
+        {
+          "display_name": "David Poll",
+          "email": "david.poll@example.com",
+          "type": "required",
+          "response": "accepted"
+        },
+        {
+          "display_name": "Conference Room 1",
+          "email": "room1@example.com",
+          "type": "room",
+          "response": "accepted"
+        },
+        {
+          "display_name": "Blake Williams",
+          "email": "blake@example.com",
+          "type": "optional",
+          "response": "declined"
+        }
+      ]
+    },
+    {
+      "event_id": "event-platform-a",
+      "title": "Platform Sync",
+      "start": "2026-07-30T14:00:00-05:00",
+      "end": "2026-07-30T14:30:00-05:00",
+      "organizer": {
+        "display_name": "Jason More",
+        "email": "jasonmore"
+      },
+      "attendees": [
+        {
+          "display_name": "Jon Fuchs",
+          "email": "jon@example.com",
+          "type": "required",
+          "response": "accepted"
+        }
+      ]
+    },
+    {
+      "event_id": "event-platform-b",
+      "title": "Platform Sync",
+      "start": "2026-07-30T14:00:00-05:00",
+      "end": "2026-07-30T14:30:00-05:00",
+      "organizer": {
+        "display_name": "Jason More",
+        "email": "jasonmore"
+      },
+      "attendees": [
+        {
+          "display_name": "Maya Ross",
+          "email": "maya@example.com",
+          "type": "required",
+          "response": "accepted"
+        }
+      ]
+    }
+  ]
+}

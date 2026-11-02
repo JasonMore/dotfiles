@@ -250,6 +250,58 @@ test_i_have_adhd_skill_install_is_noninteractive_and_global() {
 	assert_contains "${output}" "Optional step succeeded: i-have-adhd skill"
 }
 
+test_impeccable_installs_to_agents_skills_and_reruns() {
+	local home_dir output status=0
+	home_dir="$(fresh_home "impeccable-skills")"
+	output="$(run_install "${home_dir}")" || status=$?
+
+	assert_equals "${status}" "0"
+	assert_contains "${output}" "[mock-npx] --yes impeccable install --providers=codex --scope=global --no-hooks --yes"
+	assert_contains "${output}" "Optional step succeeded: Impeccable skills"
+	assert_file_exists "${home_dir}/.agents/skills/impeccable/SKILL.md"
+
+	output="$(run_install "${home_dir}")" || status=$?
+	assert_equals "${status}" "0"
+	assert_contains "${output}" "Optional step succeeded: Impeccable skills"
+	assert_file_exists "${home_dir}/.agents/skills/impeccable/SKILL.md"
+}
+
+test_impeccable_failure_does_not_abort_install() {
+	local home_dir output status=0
+	home_dir="$(fresh_home "impeccable-failure")"
+	output="$(run_install "${home_dir}" MOCK_IMPECCABLE_FAIL=1)" || status=$?
+
+	assert_equals "${status}" "0"
+	assert_contains "${output}" "optional step failed (exit 1): Impeccable skills"
+	assert_contains "${output}" "Optional step succeeded: gh-stack skill"
+	assert_contains "${output}" "Optional step succeeded: Personal AI skills install"
+	assert_contains "${output}" "Install finished with 1 optional step(s) needing attention"
+}
+
+test_impeccable_missing_skill_is_reported() {
+	local home_dir output status=0
+	home_dir="$(fresh_home "impeccable-missing-skill")"
+	output="$(run_install "${home_dir}" MOCK_IMPECCABLE_MISSING_SKILL=1)" || status=$?
+
+	assert_equals "${status}" "0"
+	assert_contains "${output}" "Error: Impeccable skill not found at ${home_dir}/.agents/skills/impeccable/SKILL.md"
+	assert_contains "${output}" "optional step failed (exit 1): Impeccable skills"
+	assert_contains "${output}" "Optional step succeeded: Personal AI skills install"
+}
+
+test_local_install_skips_impeccable() {
+	local home_dir output status=0
+	home_dir="$(fresh_home "local-no-impeccable")"
+	output="$(run_install "${home_dir}" CODESPACES=)" || status=$?
+
+	assert_equals "${status}" "0"
+	assert_not_contains "${output}" "impeccable install"
+	assert_not_contains "${output}" "Optional step: Impeccable skills"
+	if [[ -e "${home_dir}/.agents/skills/impeccable" ]]; then
+		fail "local install must not install Impeccable"
+	fi
+}
+
 test_mergiraf_installs_in_codespaces_and_reruns() {
 	local architecture expected_arch home_dir output status
 	for architecture in x86_64 aarch64 arm64; do
@@ -593,6 +645,10 @@ run_test test_existing_atuin_outside_path_is_reused
 run_test test_optional_failures_continue_to_later_steps
 run_test test_gh_stack_skill_install_is_noninteractive_and_global
 run_test test_i_have_adhd_skill_install_is_noninteractive_and_global
+run_test test_impeccable_installs_to_agents_skills_and_reruns
+run_test test_impeccable_failure_does_not_abort_install
+run_test test_impeccable_missing_skill_is_reported
+run_test test_local_install_skips_impeccable
 run_test test_mergiraf_installs_in_codespaces_and_reruns
 run_test test_mergiraf_installs_for_local_linux
 run_test test_mergiraf_uses_homebrew_on_macos

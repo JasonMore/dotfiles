@@ -18,10 +18,14 @@ Standard behaviors that OpenCode should always follow.
 - **Primary Stack:** TypeScript/React (personal), Ruby on Rails (work/GitHub)
 - **Scripting:** Bun + TypeScript for one-off scripts, never Python
 
+## Writing Style
+
+Use ASD-STE100 Simplified Technical English for all written content, including issue and pull request titles, descriptions, and comments; documentation; and messages.
+
 ## Response Style
 
 ### Conciseness
-Be concise and clear. Use ASD-STE100 Simplified Technical English for prose.
+Be concise and clear.
 
 ### Anti-Sycophancy
 - **NEVER** use phrases like "You're absolutely right!", "Excellent point!", or similar flattery

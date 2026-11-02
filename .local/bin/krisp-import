@@ -1,0 +1,533 @@
+#!/usr/bin/env python3
+"""Import Krisp documents using WorkIQ calendar routing."""
+
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import re
+import subprocess
+import sys
+import tempfile
+import unicodedata
+from dataclasses import dataclass
+from datetime import datetime, timedelta
+from pathlib import Path
+from typing import Any, Optional
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+
+DEFAULT_VAULT = Path.home() / "Library/Mobile Documents/iCloud~md~obsidian/Documents/Jason/Github"
+DEFAULT_TIMEZONE = "America/Chicago"
+GROUP_ROOT = Path("meetings/meeting transcripts")
+INDEX_NAME = ".krisp-import-index.json"
+GENERIC_SPEAKER = re.compile(r"^(speaker|participant|unknown|guest|attendee)(?:\s+\d+)?$", re.I)
+IGNORED_TITLE_WORDS = {
+    "meeting", "sync", "call", "the", "and", "with", "one", "on", "1", "1:1", "11"
+}
+RESOURCE_TYPES = {"resource", "room", "equipment"}
+DECLINED_RESPONSES = {"declined", "decline"}
+
+
+@dataclass(frozen=True)
+class Person:
+    name: str
+    directory: Optional[str]
+    aliases: tuple[str, ...]
+
+
+PEOPLE = (
+    Person("Jason More", None, ("jason more", "jason leonidas", "jason", "jasonmore")),
+    Person("Blake Williams", "blakewilliams", ("blake williams",)),
+    Person("Cody Bodfield", "cbodfield", ("cody", "cody bodfield")),
+    Person("Chris Rose", "ctmayn", ("chris rose",)),
+    Person("Francisco", "cuquo", ("francisco",)),
+    Person("David Poll", "davidpoll", ("david poll", "david")),
+    Person("D'Marcy", "dmarcy", ("d'marcy", "dmarcy")),
+    Person("Emma", "emma", ("emma",)),
+    Person("Jon Fuchs", "jfuchs", ("jon fuchs",)),
+    Person("Jon Magic", "jonmagic", ("jon magic",)),
+    Person("Jose", "jose", ("jose", "josé")),
+    Person("Manuel Puyol", "ManuelPuyol", ("manuel puyol",)),
+    Person("Matt Costa", "mattcoasta7", ("matt costa",)),
+    Person("Maya Ross", "maya", ("maya ross", "maya")),
+    Person("Skylar Anderson", "skylar", ("skylar anderson", "skylar")),
+    Person("Whitney Imura", "whitneyimura", ("whitney imura",)),
+    Person("Will Smythe", "will smythe", ("will smythe",)),
+)
+
+
+def normalized(value: Optional[str]) -> str:
+    text = unicodedata.normalize("NFKD", value or "")
+    text = "".join(char for char in text if not unicodedata.combining(char))
+    return " ".join(re.sub(r"[^a-z0-9]+", " ", text.casefold()).split())
+
+
+def person_lookup() -> dict[str, Person]:
+    result: dict[str, Person] = {}
+    for person in PEOPLE:
+        for alias in (person.name, person.directory or "", *person.aliases):
+            result[normalized(alias)] = person
+    result.pop("", None)
+    return result
+
+
+PERSON_LOOKUP = person_lookup()
+
+
+def identity(display_name: Optional[str], email: Optional[str] = None) -> tuple[str, Optional[Person]]:
+    for candidate in (email, display_name):
+        key = normalized(candidate)
+        if key in PERSON_LOOKUP:
+            person = PERSON_LOOKUP[key]
+            return person.name, person
+        if email and "@" in email:
+            local = normalized(email.split("@", 1)[0])
+            if local in PERSON_LOOKUP:
+                person = PERSON_LOOKUP[local]
+                return person.name, person
+    fallback = (display_name or email or "").strip()
+    return fallback, None
+
+
+def attendee_is_human(attendee: dict[str, Any]) -> bool:
+    attendee_type = normalized(str(attendee.get("type", "")))
+    response = normalized(str(attendee.get("response", attendee.get("status", ""))))
+    return attendee_type not in RESOURCE_TYPES and response not in DECLINED_RESPONSES
+
+
+def canonical_workiq(event: dict[str, Any]) -> tuple[set[str], dict[str, Optional[Person]], list[str]]:
+    names: set[str] = {"Jason More"}
+    resolved: dict[str, Optional[Person]] = {"Jason More": PERSON_LOOKUP["jason more"]}
+    rejected: list[str] = []
+    participants = [event.get("organizer") or {}]
+    participants.extend(a for a in event.get("attendees", []) if attendee_is_human(a))
+    for participant in participants:
+        name, person = identity(participant.get("display_name"), participant.get("email"))
+        if not name:
+            rejected.append("calendar participant missing name and email")
+            continue
+        canonical = person.name if person else name
+        names.add(canonical)
+        resolved[canonical] = person
+    return names, resolved, rejected
+
+
+def canonical_krisp(speakers: list[str]) -> tuple[set[str], list[str]]:
+    names: set[str] = set()
+    rejected: list[str] = []
+    for label in speakers:
+        if not label.strip() or GENERIC_SPEAKER.fullmatch(label.strip()):
+            rejected.append(f"generic Krisp label: {label or '<empty>'}")
+            continue
+        canonical, person = identity(label)
+        if person is None:
+            rejected.append(f"unknown Krisp label: {label}")
+            continue
+        names.add(canonical)
+    if not speakers:
+        rejected.append("Krisp speaker set empty")
+    return names, rejected
+
+
+def attribution(event: dict[str, Any], speakers: list[str]) -> dict[str, Any]:
+    workiq, _, calendar_rejections = canonical_workiq(event)
+    krisp, krisp_rejections = canonical_krisp(speakers)
+    reasons = calendar_rejections + krisp_rejections
+    missing = sorted(workiq - krisp)
+    extra = sorted(krisp - workiq)
+    if missing:
+        reasons.append("missing Krisp speakers: " + ", ".join(missing))
+    if extra:
+        reasons.append("extra Krisp speakers: " + ", ".join(extra))
+    exact = bool(workiq) and not reasons and workiq == krisp
+    return {
+        "workiq_speakers": sorted(workiq),
+        "krisp_speakers": sorted(krisp),
+        "exact_speaker_set_match": exact,
+        "attribution_rejection_reasons": reasons,
+    }
+
+
+def parse_time(value: str, timezone: ZoneInfo) -> datetime:
+    parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    if parsed.tzinfo is None:
+        raise ValueError("timestamp must include timezone offset")
+    return parsed.astimezone(timezone)
+
+
+def title_score(left: str, right: str) -> int:
+    a, b = normalized(left), normalized(right)
+    if not a or not b:
+        return 0
+    if a == b:
+        return 100
+    if a in b or b in a:
+        return 80
+    a_words = set(a.split()) - IGNORED_TITLE_WORDS
+    b_words = set(b.split()) - IGNORED_TITLE_WORDS
+    overlap = a_words & b_words
+    if not overlap:
+        return 0
+    ratio = len(overlap) / max(len(a_words), len(b_words))
+    return 50 + int(ratio * 20) if ratio >= 0.5 else 0
+
+
+def match_event(
+    meeting: dict[str, Any], events: list[dict[str, Any]], timezone: Optional[ZoneInfo] = None
+) -> tuple[Optional[dict[str, Any]], Optional[str]]:
+    timezone = timezone or ZoneInfo(DEFAULT_TIMEZONE)
+    meeting_time = parse_time(meeting["date"], timezone)
+    candidates: list[tuple[int, float, dict[str, Any]]] = []
+    for event in events:
+        event_time = parse_time(event["start"], timezone)
+        delta = abs((meeting_time - event_time).total_seconds()) / 60
+        score = title_score(meeting.get("name", ""), event.get("title", ""))
+        if delta <= 15 and score:
+            candidates.append((score, delta, event))
+    if not candidates:
+        return None, "no calendar event matched start and title"
+    candidates.sort(key=lambda item: (-item[0], item[1]))
+    best = candidates[0]
+    tied = [item for item in candidates if item[0] == best[0] and item[1] == best[1]]
+    if len(tied) > 1:
+        return None, "ambiguous overlapping calendar events"
+    return best[2], None
+
+
+def route_for_event(event: Optional[dict[str, Any]]) -> tuple[Path, list[str], Optional[str]]:
+    if event is None:
+        return GROUP_ROOT, [], "calendar manifest unavailable or event unmatched"
+    names, resolved, rejections = canonical_workiq(event)
+    non_jason = sorted(name for name in names if name != "Jason More")
+    if rejections:
+        return GROUP_ROOT, non_jason, "; ".join(rejections)
+    if not non_jason:
+        return GROUP_ROOT, non_jason, "no usable non-Jason calendar invitees"
+    unknown = [name for name in non_jason if resolved.get(name) is None]
+    if unknown:
+        return GROUP_ROOT, non_jason, "unknown person mapping: " + ", ".join(unknown)
+    if len(non_jason) == 1:
+        return Path("one-one") / resolved[non_jason[0]].directory, non_jason, None
+    return GROUP_ROOT, non_jason, None
+
+
+def safe_filename(meeting: dict[str, Any], timezone: Optional[ZoneInfo] = None) -> str:
+    stamp = parse_time(meeting["date"], timezone or ZoneInfo(DEFAULT_TIMEZONE))
+    title = re.sub(r"[/:\x00]", "_", meeting.get("name", "Untitled"))
+    return f"{stamp:%Y-%m-%d %H.%M.%S} {title}.md"
+
+
+def load_json(path: Path, default: Any) -> Any:
+    if not path.exists():
+        return default
+    with path.open(encoding="utf-8") as handle:
+        return json.load(handle)
+
+
+def valid_manifest(manifest: Any) -> bool:
+    if not isinstance(manifest, dict):
+        return False
+    if type(manifest.get("schema_version")) is not int or manifest["schema_version"] != 1:
+        return False
+    if not isinstance(manifest.get("timezone"), str):
+        return False
+    try:
+        timezone = ZoneInfo(manifest["timezone"])
+    except (ZoneInfoNotFoundError, ValueError):
+        return False
+    if not isinstance(manifest.get("generated_at"), str):
+        return False
+    try:
+        parse_time(manifest["generated_at"], timezone)
+    except (TypeError, ValueError):
+        return False
+    if not isinstance(manifest.get("events"), list):
+        return False
+    required_event = {"event_id", "title", "start", "end", "organizer", "attendees"}
+    required_person = {"display_name", "email"}
+    required_attendee = required_person | {"type", "response"}
+    for event in manifest["events"]:
+        if not isinstance(event, dict) or not required_event.issubset(event):
+            return False
+        if not isinstance(event["event_id"], str) or not event["event_id"].strip():
+            return False
+        if not isinstance(event["title"], str) or not event["title"].strip():
+            return False
+        if not isinstance(event["start"], str) or not isinstance(event["end"], str):
+            return False
+        try:
+            start = parse_time(event["start"], timezone)
+            end = parse_time(event["end"], timezone)
+        except (TypeError, ValueError):
+            return False
+        if end < start:
+            return False
+        organizer = event["organizer"]
+        if not isinstance(organizer, dict) or not required_person.issubset(organizer):
+            return False
+        if any(not isinstance(organizer[field], str) for field in required_person):
+            return False
+        if not event["event_id"] or not isinstance(event["attendees"], list):
+            return False
+        for attendee in event["attendees"]:
+            if not isinstance(attendee, dict) or not required_attendee.issubset(attendee):
+                return False
+            if any(not isinstance(attendee[field], str) for field in required_attendee):
+                return False
+    return True
+
+
+def manifest_routing(
+    manifest: Any,
+) -> tuple[list[dict[str, Any]], Optional[str], ZoneInfo]:
+    if not valid_manifest(manifest):
+        return [], "invalid calendar manifest schema", ZoneInfo(DEFAULT_TIMEZONE)
+    return manifest["events"], None, ZoneInfo(manifest["timezone"])
+
+
+def load_manifest_routing(path: Path) -> tuple[list[dict[str, Any]], Optional[str], ZoneInfo]:
+    try:
+        manifest = load_json(path, {})
+    except (json.JSONDecodeError, OSError):
+        return [], "invalid calendar manifest schema: unable to parse JSON", ZoneInfo(DEFAULT_TIMEZONE)
+    return manifest_routing(manifest)
+
+
+def atomic_write(path: Path, content: str) -> None:
+    pending: Optional[Path] = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w",
+            encoding="utf-8",
+            dir=path.parent,
+            prefix=f".{path.name}.",
+            suffix=".krisp-import-new",
+            delete=False,
+        ) as handle:
+            pending = Path(handle.name)
+            handle.write(content)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(pending, path)
+    finally:
+        if pending is not None:
+            try:
+                pending.unlink()
+            except FileNotFoundError:
+                pass
+
+
+def write_index(path: Path, index: dict[str, Any]) -> None:
+    atomic_write(path, json.dumps(index, indent=2, sort_keys=True) + "\n")
+
+
+def existing_import(
+    vault: Path,
+    meeting: dict[str, Any],
+    index: dict[str, Any],
+    timezone: Optional[ZoneInfo] = None,
+) -> Optional[Path]:
+    meeting_id = meeting["meeting_id"]
+    indexed = index.get("meetings", {}).get(meeting_id, {}).get("path")
+    if indexed and (vault / indexed).is_file():
+        return vault / indexed
+    timezone = timezone or ZoneInfo(DEFAULT_TIMEZONE)
+    target_time = parse_time(meeting["date"], timezone)
+    for root in (vault / "one-one", vault / GROUP_ROOT):
+        if not root.exists():
+            continue
+        for path in root.rglob(f"{target_time:%Y-%m-%d}*.md"):
+            match = re.match(r"^\d{4}-\d{2}-\d{2} (\d{2})\.(\d{2})\.(\d{2}) (.*)\.md$", path.name)
+            if not match:
+                continue
+            file_time = target_time.replace(
+                hour=int(match[1]), minute=int(match[2]), second=int(match[3])
+            )
+            if abs((file_time - target_time).total_seconds()) > 15 * 60:
+                continue
+            if title_score(meeting.get("name", ""), match[4]):
+                return path
+    return None
+
+
+def existing_attribution(
+    vault: Path,
+    existing: Path,
+    meeting: dict[str, Any],
+    current: dict[str, Any],
+    index: dict[str, Any],
+) -> dict[str, Any]:
+    record = index.get("meetings", {}).get(meeting["meeting_id"], {})
+    relative = str(existing.relative_to(vault))
+    trusted = (
+        record.get("path") == relative
+        and record.get("exact_speaker_set_match") is True
+        and record.get("workiq_speakers") == current["workiq_speakers"]
+        and record.get("krisp_speakers") == sorted(current["krisp_speakers"])
+        and current["exact_speaker_set_match"] is True
+    )
+    if trusted:
+        return current
+    result = dict(current)
+    result["exact_speaker_set_match"] = False
+    reasons = list(current["attribution_rejection_reasons"])
+    reasons.append("existing transcript not refreshed after Krisp label changes")
+    result["attribution_rejection_reasons"] = reasons
+    return result
+
+
+def krisp_json(arguments: list[str]) -> dict[str, Any]:
+    result = subprocess.run(
+        ["krisp", *arguments, "--json"],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    return json.loads(result.stdout)
+
+
+def unwrap(data: dict[str, Any], key: str) -> Any:
+    return data.get("structuredContent", data).get(key, [])
+
+
+def date_bounds(target: str) -> tuple[str, str]:
+    value = datetime.strptime(target, "%Y-%m-%d")
+    return ((value - timedelta(days=1)).date().isoformat(), (value + timedelta(days=1)).date().isoformat())
+
+
+def meeting_on_target_date(meeting: dict[str, Any], target: str, timezone: ZoneInfo) -> bool:
+    return parse_time(meeting["date"], timezone).date().isoformat() == target
+
+
+def import_meetings(args: argparse.Namespace) -> int:
+    vault = Path(os.environ.get("VAULT_ROOT", DEFAULT_VAULT)).expanduser()
+    events: list[dict[str, Any]] = []
+    manifest_error: Optional[str] = None
+    timezone = ZoneInfo(DEFAULT_TIMEZONE)
+    if args.calendar_manifest:
+        events, manifest_error, timezone = load_manifest_routing(args.calendar_manifest)
+    else:
+        manifest_error = "calendar manifest not provided"
+
+    target_date = args.date or datetime.now(timezone).date().isoformat()
+    before, after = date_bounds(target_date)
+    print(f"Searching Krisp for meetings on {target_date} (range: {before} to {after})...")
+    data = krisp_json([
+        "search-meetings", "--after", before, "--before", after,
+        "--fields", '["name","date","speakers","transcript"]', "--limit", "50",
+    ])
+    meetings = [
+        meeting for meeting in unwrap(data, "meetings")
+        if meeting_on_target_date(meeting, target_date, timezone)
+    ]
+    index_path = vault / INDEX_NAME
+    index = load_json(index_path, {"schema_version": 1, "meetings": {}})
+    counts = {"imported": 0, "skipped": 0, "existing": 0}
+
+    for meeting in meetings:
+        event, match_error = (
+            match_event(meeting, events, timezone) if events else (None, manifest_error)
+        )
+        route, _, route_error = route_for_event(event)
+        canonical_invitees = sorted(canonical_workiq(event)[0]) if event else []
+        unresolved = match_error or route_error
+        if event:
+            attribution_result = attribution(event, meeting.get("speakers", []))
+        else:
+            krisp_speakers, krisp_rejections = canonical_krisp(meeting.get("speakers", []))
+            attribution_result = {
+                "workiq_speakers": [],
+                "krisp_speakers": krisp_speakers,
+                "exact_speaker_set_match": False,
+                "attribution_rejection_reasons": (
+                    [unresolved or "calendar event unavailable"] + krisp_rejections
+                ),
+            }
+        existing = existing_import(vault, meeting, index, timezone)
+        if existing:
+            attribution_result = existing_attribution(
+                vault, existing, meeting, attribution_result, index
+            )
+            relative = str(existing.relative_to(vault))
+            record = index.setdefault("meetings", {}).get(meeting["meeting_id"])
+            if not record or record.get("path") != relative:
+                index["meetings"][meeting["meeting_id"]] = {
+                    "path": relative,
+                    "location_only": True,
+                }
+                write_index(index_path, index)
+        route_label = str(route)
+        print(f"\nMeeting: {meeting.get('name', '<untitled>')}")
+        print(f"  Calendar match: {event.get('event_id') if event else 'none'}")
+        print(
+            "  Canonical invitees: "
+            + (", ".join(canonical_invitees) if canonical_invitees else "none")
+        )
+        print(f"  Route: {route_label}")
+        print(f"  Exact speaker-set match: {str(attribution_result['exact_speaker_set_match']).lower()}")
+        if attribution_result["attribution_rejection_reasons"]:
+            print("  Attribution rejected: " + "; ".join(attribution_result["attribution_rejection_reasons"]))
+        print(f"  Unresolved reason: {unresolved or 'none'}")
+        if existing:
+            print(f"  Existing transcript: {existing}")
+            print("  No file written. Review existing location before moving it.")
+            counts["existing"] += 1
+            continue
+        status = meeting.get("transcript", {}).get("status", "")
+        if status not in {"uploaded", "ready"}:
+            print(f"  Skipped: transcript status {status or 'unknown'}")
+            counts["skipped"] += 1
+            continue
+        destination = vault / route / safe_filename(meeting, timezone)
+        document_data = krisp_json(
+            ["get-multiple-documents", "--ids", json.dumps([meeting["meeting_id"]])]
+        )
+        results = unwrap(document_data, "results")
+        document = results[0].get("document") if results else None
+        if not document:
+            print("  Skipped: empty document")
+            counts["skipped"] += 1
+            continue
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        atomic_write(destination, document)
+        relative = str(destination.relative_to(vault))
+        index.setdefault("meetings", {})[meeting["meeting_id"]] = {
+            "path": relative,
+            "calendar_event_id": event.get("event_id") if event else None,
+            "workiq_speakers": attribution_result["workiq_speakers"],
+            "krisp_speakers": sorted(attribution_result["krisp_speakers"]),
+            "exact_speaker_set_match": attribution_result["exact_speaker_set_match"],
+            "attribution_rejection_reasons": attribution_result["attribution_rejection_reasons"],
+        }
+        write_index(index_path, index)
+        print(f"  Imported: {destination}")
+        counts["imported"] += 1
+
+    print(
+        f"\nDone: {counts['imported']} imported, {counts['skipped']} skipped, "
+        f"{counts['existing']} already present."
+    )
+    return 0
+
+
+def parser() -> argparse.ArgumentParser:
+    result = argparse.ArgumentParser(description=__doc__)
+    result.add_argument("date", nargs="?", help="local date, YYYY-MM-DD")
+    result.add_argument("--calendar-manifest", type=Path, help="WorkIQ calendar routing manifest")
+    return result
+
+
+if __name__ == "__main__":
+    try:
+        raise SystemExit(import_meetings(parser().parse_args()))
+    except (
+        subprocess.CalledProcessError,
+        json.JSONDecodeError,
+        OSError,
+        TypeError,
+        ValueError,
+        ZoneInfoNotFoundError,
+    ) as error:
+        print(f"krisp-import: {error}", file=sys.stderr)
+        raise SystemExit(1)

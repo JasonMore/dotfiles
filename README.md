@@ -6,6 +6,9 @@ Codespaces install flow also migrates legacy `.vscode/mcp.json` files to `.mcp.j
 Installs a macOS `copilot-notify` launchd daemon (see `.copilot/bin/copilot-notify.sh`) that fires push notifications when local, Codespace, or cloud Copilot agent sessions finish or need input.
 Clones `JasonMore/ai-skills` (Jason-authored skills only) and runs its installer so personal Copilot skills persist across Codespaces. Personal AI skills always install last, so they win any same-name skill conflicts with other installers.
 Installs `i-have-adhd` globally and keeps its output rules active through the shared Copilot instructions.
+In Codespaces, installs Impeccable into `~/.agents/skills/impeccable` with
+`npx --yes impeccable install --providers=codex --scope=global --no-hooks --yes`.
+This step needs no input and does not add project hooks. Personal AI skills still install last.
 `.copilot/mcp-config.json` is symlinked to `~/.copilot/mcp-config.json` and registers global MCP servers for Copilot Desktop/CLI.
 
 ## Mergiraf
@@ -26,9 +29,9 @@ with `mergiraf=0`.
 
 `install` is split into strict **core** steps (local symlinks/config; abort on
 failure) and **optional** integrations (Atuin, agent skills, gh-stack,
-Copilot coder plugin, i-have-adhd, personal AI skills). Optional
-steps run through a named runner that logs the exact failed step and exit
-status, then continues; a missing secret, network hiccup, or external
+Copilot coder plugin, Impeccable, Mergiraf, i-have-adhd, personal AI skills).
+Optional steps run through a named runner that logs the exact failed step and
+exit status, then continues; a missing secret, network hiccup, or external
 installer failure never blocks the rest of the install. Personal AI skills
 (`JasonMore/ai-skills`) always install last, so they stay authoritative even
 if an earlier optional step failed.
@@ -47,6 +50,30 @@ To repair it, rerun the installer manually from the Codespace terminal:
 
 It's safe to rerun any time; every step is idempotent, and any optional
 failures are printed as a summary at the end with the exact step name.
+
+## HG560T34 monitor role
+
+`set-monitor-role.py` targets the connected HG560T34 with vendor `4a8b` and
+product `6034`. It sets `DisplayIsTV` to `false` in a local display override.
+It preserves other override settings and saves a backup before changing an
+existing file. The override affects all monitors with the same vendor/product
+IDs. It does not change the monitor firmware.
+
+Preview without changing system files:
+
+```sh
+python3 set-monitor-role.py
+```
+
+Install the override, then save your work and restart the Mac:
+
+```sh
+sudo python3 set-monitor-role.py --apply
+```
+
+After restart, run `python3 set-monitor-role.py --check`, then turn on Night
+Shift to check its visible effect. The script does not restart the Mac or
+WindowServer. Installing the override alone does not prove Night Shift works.
 
 ## Tests
 
