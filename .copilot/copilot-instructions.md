@@ -75,13 +75,13 @@ Explain in full when asked. Confirm destructive actions. After three failed fixe
 ## Pull Requests
 
 - Always open pull requests as drafts using the `--draft` flag.
+- **Review feedback.** A request to address PR review feedback, including Copilot code review feedback, is enough to make warranted fixes and push them to the PR branch with a normal `git push`. If no fix is warranted or you cannot push, explain why. Do not ask again just because the PR is `MERGEABLE`, is a draft, is `BEHIND`, or has outstanding reviews or CI checks. `MERGEABLE` means there are no merge conflicts. It does not mean a reviewer approved the PR.
 - **Conditional auto force-push.** You may run `git push --force-with-lease` automatically, without asking, ONLY when BOTH hold:
   1. The PR is a draft **OR** has failing/pending required CI checks that block merge, AND
-  2. The PR has **NOT** been approved by any reviewer.
+  2. You verified that no reviewer has approved the PR.
 - **Reviewer approval always blocks force-push.** Never auto force-push to an approved PR, even if it is a draft or CI is failing. Ask for explicit confirmation first.
-- In any other case (PR is not a draft and CI is passing, or status is unknown), do not force push without explicit user confirmation.
+- If neither eligibility condition applies, or if eligibility or reviewer approval is unknown, ask for explicit confirmation before force-pushing.
 - Always use `--force-with-lease`, never plain `git push --force` or `git push -f`.
-- Do not address PR review comments if the PR is already mergeable. If the merge status is mergeable, stop and ask whether to address the comments before making changes.
 
 ## Notifications
 
