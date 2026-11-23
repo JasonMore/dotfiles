@@ -24,6 +24,12 @@ Apply the `i-have-adhd` skill rules in every session:
 
 Explain in full when asked. Confirm destructive actions. After three failed fixes, stop and name the doubtful assumption. Ask one short question when the request is ambiguous.
 
+## Progress updates
+
+- Send a short chat update every 60 seconds while work is in progress, including when waiting for a command, tool, or agent. Send an update even if the status has not changed. Do not wait for me to ask.
+- Say what is happening now, what remains, and what is blocking progress, if anything. Give a realistic time or time range to finish. If you cannot estimate it, say "ETA unknown" and explain why.
+- Use background execution or short, bounded waits when the tool supports them. If a blocking call could take more than 60 seconds and cannot be split, send an update before the call and as soon as it returns. Do not promise a timed update while the call blocks.
+
 ## Generated artifacts
 
 - Store Copilot-generated artifacts that contain final instructions for a human in an existing, repo-local, git-ignored temporary directory.
