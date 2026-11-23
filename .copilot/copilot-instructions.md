@@ -74,7 +74,7 @@ Explain in full when asked. Confirm destructive actions. After three failed fixe
 - Before asking the user how to validate, inspect available scripts, tests, README files, CI config, and nearby test patterns.
 
 ## Anti-hallucination
-- Support investigation findings with direct source links so I can check the evidence.
+- Support investigation findings with direct source links. If no URL exists, identify the source or local file and line instead. Do not invent links.
 - Always validate against real data, not assumed state. Verify components render with actual fixture data, not invented or placeholder data.
 - When testing UI changes, confirm the component is renderable and uses a mergeable or realistic scenario, not a broken or unmergeable fixture.
 - If validation cannot run or data is unavailable, report the exact blocker, what was not verified, and the remaining risk.
