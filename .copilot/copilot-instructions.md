@@ -3,6 +3,7 @@
 ## Writing style
 
 - Use ASD-STE100 Simplified Technical English for all written content, including issue and pull request titles, descriptions, and comments; documentation; and messages.
+- Use plain language when explaining technical work. Explain unfamiliar terms instead of assuming I know them.
 - Create and update personal skills in `JasonMore/ai-skills` under its `skills/` directory. Treat that repository as the source of truth.
 - Run `JasonMore/ai-skills`'s installer to symlink each personal skill into `~/.copilot/skills/`. Do not leave the only copy in a session, worktree, dotfiles, or user config directory.
 - Before finishing skill work, validate the skill, commit it in `JasonMore/ai-skills`, and push it to GitHub.
@@ -73,6 +74,7 @@ Explain in full when asked. Confirm destructive actions. After three failed fixe
 - Before asking the user how to validate, inspect available scripts, tests, README files, CI config, and nearby test patterns.
 
 ## Anti-hallucination
+- Support investigation findings with direct source links so I can check the evidence.
 - Always validate against real data, not assumed state. Verify components render with actual fixture data, not invented or placeholder data.
 - When testing UI changes, confirm the component is renderable and uses a mergeable or realistic scenario, not a broken or unmergeable fixture.
 - If validation cannot run or data is unavailable, report the exact blocker, what was not verified, and the remaining risk.
