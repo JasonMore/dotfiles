@@ -27,8 +27,9 @@ with `mergiraf=0`.
 
 ## Excalidraw CLI
 
-On local machines and in Codespaces, `./install` runs
-`npm install -g @excalidraw/cli`. The [Excalidraw CLI](https://github.com/excalidraw/cli#install)
+On local machines, `./install` runs `npm install -g @excalidraw/cli`.
+The installer skips this step in Codespaces.
+The [Excalidraw CLI](https://github.com/excalidraw/cli#install)
 requires Node.js 22 or newer and npm on `PATH`. The installer uses your
 configured npm global prefix without `sudo`. Make sure you can write to that
 prefix and its `bin` directory is on `PATH`. After installation, run

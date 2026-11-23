@@ -373,7 +373,9 @@ run_optional_step "Mergiraf" "${DOTFILES_DIR}/install-mergiraf"
 # Install the external skill for local and Codespaces Copilot sessions.
 run_optional_step "i-have-adhd skill" install_i_have_adhd_skill
 
-run_optional_step "Excalidraw CLI" install_excalidraw_cli
+if [[ -z "${CODESPACES:-}" ]]; then
+	run_optional_step "Excalidraw CLI" install_excalidraw_cli
+fi
 
 # Install personal skills last so external installers cannot overwrite them.
 # Kept optional (like the other external integrations) so a failure here

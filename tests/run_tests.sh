@@ -633,20 +633,27 @@ test_second_run_is_idempotent() {
 	assert_contains "${second_output}" "mock-git] pull (mocked, no-op)"
 }
 
-test_excalidraw_installs_locally_and_in_codespaces() {
-	local codespaces home_dir output
-	for codespaces in "" 1; do
-		home_dir="$(fresh_home "excalidraw-${codespaces:-local}")"
-		output="$(run_install "${home_dir}" CODESPACES="${codespaces}")" || fail "${output}"
-		assert_contains "${output}" "[mock-npm] install -g @excalidraw/cli"
-		assert_contains "${output}" "Optional step succeeded: Excalidraw CLI"
-	done
+test_excalidraw_installs_locally() {
+	local home_dir output
+	home_dir="$(fresh_home "excalidraw-local")"
+	output="$(run_install "${home_dir}" CODESPACES=)" || fail "${output}"
+	assert_contains "${output}" "[mock-npm] install -g @excalidraw/cli"
+	assert_contains "${output}" "Optional step succeeded: Excalidraw CLI"
+}
+
+test_excalidraw_is_skipped_in_codespaces() {
+	local home_dir output
+	home_dir="$(fresh_home "excalidraw-codespaces")"
+	output="$(run_install "${home_dir}")" || fail "${output}"
+	assert_not_contains "${output}" "[mock-npm]"
+	assert_not_contains "${output}" "Excalidraw CLI"
+	assert_contains "${output}" "Install complete; all steps succeeded."
 }
 
 test_excalidraw_requires_node_22() {
 	local home_dir output
 	home_dir="$(fresh_home "excalidraw-old-node")"
-	output="$(run_install "${home_dir}" MOCK_NODE_VERSION=v21.7.3)" || fail "${output}"
+	output="$(run_install "${home_dir}" CODESPACES= MOCK_NODE_VERSION=v21.7.3)" || fail "${output}"
 	assert_contains "${output}" "Excalidraw CLI requires Node.js 22 or newer (found: v21.7.3)"
 	assert_not_contains "${output}" "[mock-npm]"
 	assert_contains "${output}" "[dotfiles]   - Excalidraw CLI (exit 1)"
@@ -656,7 +663,7 @@ test_excalidraw_requires_node_22() {
 test_excalidraw_npm_failure_does_not_abort_install() {
 	local home_dir output
 	home_dir="$(fresh_home "excalidraw-npm-failure")"
-	output="$(run_install "${home_dir}" MOCK_NPM_STATUS=42)" || fail "${output}"
+	output="$(run_install "${home_dir}" CODESPACES= MOCK_NPM_STATUS=42)" || fail "${output}"
 	assert_contains "${output}" "[mock-npm] install -g @excalidraw/cli"
 	assert_contains "${output}" "[dotfiles]   - Excalidraw CLI (exit 42)"
 	assert_file_exists "${home_dir}/.copilot/ai-skills/.marker/personal-ai-skills-installed"
@@ -695,7 +702,8 @@ run_test test_personal_ai_skills_install_last_and_present
 run_test test_personal_ai_skills_clone_does_not_need_gh_auth
 run_test test_plugin_update_failure_preserves_existing_install
 run_test test_second_run_is_idempotent
-run_test test_excalidraw_installs_locally_and_in_codespaces
+run_test test_excalidraw_installs_locally
+run_test test_excalidraw_is_skipped_in_codespaces
 run_test test_excalidraw_requires_node_22
 run_test test_excalidraw_npm_failure_does_not_abort_install
 
