@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if [[ $# -ne 3 || "$1" != "install" || "$2" != "-g" || "$3" != "@excalidraw/cli" ]]; then
+	echo "[mock-npm] unexpected arguments: $*" >&2
+	exit 2
+fi
+echo "[mock-npm] $*"
+exit "${MOCK_NPM_STATUS:-0}"

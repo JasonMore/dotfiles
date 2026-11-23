@@ -25,11 +25,24 @@ Run `mergiraf review <merge-id>` with the ID printed after an automatic
 resolution. To use Git's normal merge behavior for one command, prefix it
 with `mergiraf=0`.
 
+## Excalidraw CLI
+
+On local machines and in Codespaces, `./install` runs
+`npm install -g @excalidraw/cli`. The [Excalidraw CLI](https://github.com/excalidraw/cli#install)
+requires Node.js 22 or newer and npm on `PATH`. The installer uses your
+configured npm global prefix without `sudo`. Make sure you can write to that
+prefix and its `bin` directory is on `PATH`. After installation, run
+`excalidraw --help`.
+
+If a requirement is missing or npm fails, the installer reports the failure
+and continues. Fix the reported problem and rerun `./install` to retry.
+
 ## Reliability model
 
 `install` is split into strict **core** steps (local symlinks/config; abort on
 failure) and **optional** integrations (Atuin, agent skills, gh-stack,
-Copilot coder plugin, Impeccable, Mergiraf, i-have-adhd, personal AI skills).
+Copilot coder plugin, Impeccable, Mergiraf, i-have-adhd, Excalidraw CLI,
+personal AI skills).
 Optional steps run through a named runner that logs the exact failed step and
 exit status, then continues; a missing secret, network hiccup, or external
 installer failure never blocks the rest of the install. Personal AI skills
