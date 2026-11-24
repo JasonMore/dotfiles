@@ -90,10 +90,6 @@ Explain in full when asked. Confirm destructive actions. After three failed fixe
 - In any other case (PR is not a draft and CI is passing, or status is unknown), do not force push without explicit user confirmation.
 - Always use `--force-with-lease`, never plain `git push --force` or `git push -f`.
 
-## Notifications
-
-- When you need user input or attention, run `osascript -e 'display notification "MESSAGE" with title "Copilot" sound name "Glass"'` to send a macOS push notification. Replace `MESSAGE` with a short summary.
-
 ## Slack
 
 - Prefer the Slack MCP for Slack operations: read threads, send messages, and fetch context.
