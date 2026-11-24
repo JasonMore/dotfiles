@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+[[ $# -eq 1 && "$1" == "--version" ]] || exit 1
+printf '%s\n' "${MOCK_NODE_VERSION:-v22.0.0}"

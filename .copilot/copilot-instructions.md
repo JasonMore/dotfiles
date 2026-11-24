@@ -4,7 +4,6 @@
 
 - Use ASD-STE100 Simplified Technical English for all written content, including issue and pull request titles, descriptions, and comments; documentation; and messages.
 - Use plain language when explaining technical work. Explain unfamiliar terms instead of assuming I know them.
-- Support investigation findings with direct source links. If no URL exists, identify the source or local file and line instead. Do not invent links.
 - Create and update personal skills in `JasonMore/ai-skills` under its `skills/` directory. Treat that repository as the source of truth.
 - Run `JasonMore/ai-skills`'s installer to symlink each personal skill into `~/.copilot/skills/`. Do not leave the only copy in a session, worktree, dotfiles, or user config directory.
 - Before finishing skill work, validate the skill, commit it in `JasonMore/ai-skills`, and push it to GitHub.
@@ -25,6 +24,12 @@ Apply the `i-have-adhd` skill rules in every session:
 10. Do not use preambles, recaps, or closing pleasantries.
 
 Explain in full when asked. Confirm destructive actions. After three failed fixes, stop and name the doubtful assumption. Ask one short question when the request is ambiguous.
+
+## Progress updates
+
+- Send a short chat update every 60 seconds while work is in progress, including when waiting for a command, tool, or agent. Send an update even if the status has not changed. Do not wait for me to ask.
+- Say what is happening now, what remains, and what is blocking progress, if anything. Give a realistic time or time range to finish. If you cannot estimate it, say "ETA unknown" and explain why.
+- Use background execution or short, bounded waits when the tool supports them. If a blocking call could take more than 60 seconds and cannot be split, send an update before the call and as soon as it returns. Do not promise a timed update while the call blocks.
 
 ## Generated artifacts
 
@@ -69,6 +74,7 @@ Explain in full when asked. Confirm destructive actions. After three failed fixe
 - Before asking the user how to validate, inspect available scripts, tests, README files, CI config, and nearby test patterns.
 
 ## Anti-hallucination
+- Support investigation findings with direct source links. If no URL exists, identify the source or local file and line instead. Do not invent links.
 - Always validate against real data, not assumed state. Verify components render with actual fixture data, not invented or placeholder data.
 - When testing UI changes, confirm the component is renderable and uses a mergeable or realistic scenario, not a broken or unmergeable fixture.
 - If validation cannot run or data is unavailable, report the exact blocker, what was not verified, and the remaining risk.

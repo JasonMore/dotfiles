@@ -200,6 +200,20 @@ install_i_have_adhd_skill() {
 	npx skills add ayghri/i-have-adhd --agent github-copilot --global --yes
 }
 
+install_excalidraw_cli() {
+	local node_version
+	if ! command -v node >/dev/null 2>&1 || ! command -v npm >/dev/null 2>&1; then
+		echo "[dotfiles] Excalidraw CLI requires Node.js 22 or newer and npm on PATH" >&2
+		return 1
+	fi
+	if ! node_version="$(node --version)" || [[ ! "${node_version}" =~ ^v([0-9]+)\. ]] ||
+		(( BASH_REMATCH[1] < 22 )); then
+		echo "[dotfiles] Excalidraw CLI requires Node.js 22 or newer (found: ${node_version:-unknown})" >&2
+		return 1
+	fi
+	npm install -g @excalidraw/cli
+}
+
 # copilot-notify daemon (macOS only, not Codespaces; uses osascript + launchctl)
 if [[ "$(uname)" == "Darwin" && -z "${CODESPACES:-}" ]]; then
 	echo "[dotfiles] Installing copilot-notify daemon"
@@ -358,6 +372,10 @@ run_optional_step "Mergiraf" "${DOTFILES_DIR}/install-mergiraf"
 
 # Install the external skill for local and Codespaces Copilot sessions.
 run_optional_step "i-have-adhd skill" install_i_have_adhd_skill
+
+if [[ -z "${CODESPACES:-}" ]]; then
+	run_optional_step "Excalidraw CLI" install_excalidraw_cli
+fi
 
 # Install personal skills last so external installers cannot overwrite them.
 # Kept optional (like the other external integrations) so a failure here
