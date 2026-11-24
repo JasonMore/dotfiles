@@ -192,7 +192,8 @@ install_personal_ai_skills_run() {
 		echo "[dotfiles] Warning: ${ai_skills_dir}/install not found or not executable" >&2
 		return 1
 	fi
-	"${ai_skills_dir}/install"
+	"${ai_skills_dir}/install" || return 1
+	"${DOTFILES_DIR}/install-agent-skills" --sync-personal-priority
 }
 
 install_i_have_adhd_skill() {
@@ -317,10 +318,6 @@ if [[ -n "${CODESPACES:-}" ]]; then
 
 	run_optional_step "Copilot agent configuration" copy_copilot_agent_config
 
-	# --- OPTIONAL: agent skills (external installer + gh extension) --------
-
-	run_optional_step "Agent skills" "${DOTFILES_DIR}/install-agent-skills"
-
 	install_impeccable_skills() {
 		npx --yes impeccable install --providers=codex --scope=global --no-hooks --yes || return 1
 		if [[ ! -f "${HOME}/.agents/skills/impeccable/SKILL.md" ]]; then
@@ -352,6 +349,9 @@ if [[ -n "${CODESPACES:-}" ]]; then
 	run_optional_step "Copilot coder plugin" "${DOTFILES_DIR}/install-copilot-plugin"
 
 fi
+
+# Install agent-config skills with APM for local and Codespaces sessions.
+run_optional_step "Agent skills" "${DOTFILES_DIR}/install-agent-skills"
 
 # Install and configure Mergiraf for local and Codespaces development.
 run_optional_step "Mergiraf" "${DOTFILES_DIR}/install-mergiraf"

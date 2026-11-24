@@ -11,6 +11,34 @@ In Codespaces, installs Impeccable into `~/.agents/skills/impeccable` with
 This step needs no input and does not add project hooks. Personal AI skills still install last.
 `.copilot/mcp-config.json` is symlinked to `~/.copilot/mcp-config.json` and registers global MCP servers for Copilot Desktop/CLI.
 
+## Agent skills
+
+The installer uses [Agent Package Manager (APM)](https://microsoft.github.io/apm/)
+to install and update skills from `github/agent-config` for local and Codespaces
+sessions. APM stores its user manifest and lockfile in `~/.apm/` and deploys
+skills to `~/.agents/skills/`. It preserves existing skill selections and version
+pins, and updates only `github/agent-config`. If APM is missing, the installer
+uses a pinned, checksum-verified APM installer. The standalone APM executable
+is installed at `~/.local/bin/apm` without changing shell profiles.
+
+The private `github/agent-config` repository requires access through GitHub CLI
+authentication or an APM token. See the [APM authentication guide](https://microsoft.github.io/apm/consumer/authentication/).
+
+After APM installs successfully, the installer moves matching old folders from
+`~/.copilot/skills/` to a new `~/.copilot/skills-before-apm.XXXXXXXX/` backup.
+Personal skills and existing skill links stay in place. An unrelated link that
+would hide an APM skill stops the migration without moving any folders. To
+restore an old skill, move its folder from the backup to `~/.copilot/skills/`.
+In a Git repository, the restored copy takes precedence over the APM version.
+In a non-repository folder under your home directory, add a matching link in
+`~/.github/skills/` to give the restored copy precedence. A later installer run
+backs up matching non-personal folders again.
+
+When a personal skill has the same name as a shared skill, the installer also
+links it from `~/.github/skills/`. This keeps the personal skill first when
+Copilot starts in a non-repository folder under your home directory. Existing
+files and links at that location are not replaced.
+
 ## Mergiraf
 
 The installer adds [Mergiraf](https://mergiraf.org/) with Homebrew on macOS

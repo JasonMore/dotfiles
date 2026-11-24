@@ -2,72 +2,228 @@
 
 set -euo pipefail
 
-echo "[agent-skills] Installing agent skills from github/agent-config repository"
+APM_VERSION="0.35.0"
+APM_INSTALL_SHA256="0e813353630c02a9eb961fbad82cf916967e855aa84a533940975c5d699c9caa"
+APM_INSTALL_URL="https://raw.githubusercontent.com/microsoft/apm/v${APM_VERSION}/install.sh"
+APM_PACKAGE="github/agent-config"
+apm_bin=""
+installer_file=""
 
-# Define directories
-TEMP_DIR=$(mktemp -d)
-trap 'rm -rf -- "${TEMP_DIR}"' EXIT
-SKILLS_REPO="https://github.com/github/agent-config.git"
-TARGET_DIR="${HOME}/.copilot/skills"
+cleanup() {
+	if [[ -n "${installer_file}" ]]; then
+		rm -f -- "${installer_file}"
+	fi
+}
+trap cleanup EXIT
 
-# Clone the github/agent-config repository
-echo "[agent-skills] Cloning github/agent-config repository..."
-if ! git clone --depth=1 "${SKILLS_REPO}" "${TEMP_DIR}"; then
-    echo "[agent-skills] Error: Failed to clone github/agent-config repository"
-    echo "[agent-skills] Please check your network connection and try again"
-    exit 1
+install_apm() {
+	local version_output checksum_output
+
+	if apm_bin="$(type -P apm)"; then
+		echo "[agent-skills] Using APM at ${apm_bin}"
+	elif [[ -x "${HOME}/.local/bin/apm" ]]; then
+		apm_bin="${HOME}/.local/bin/apm"
+		echo "[agent-skills] Using APM at ${apm_bin}"
+	elif [[ -e "${HOME}/.local/bin/apm" || -L "${HOME}/.local/bin/apm" ||
+		-e "${HOME}/.local/lib/apm" || -L "${HOME}/.local/lib/apm" ]]; then
+		echo "[agent-skills] Error: an existing APM path is not usable; restore its executable before installing" >&2
+		return 1
+	else
+		installer_file="$(mktemp "${TMPDIR:-/tmp}/dotfiles-apm.XXXXXX")"
+		echo "[agent-skills] Downloading APM ${APM_VERSION}"
+		if ! curl --proto '=https' --proto-redir '=https' --tlsv1.2 \
+			--fail --silent --show-error --location --retry 2 \
+			--connect-timeout 15 --max-time 120 \
+			--output "${installer_file}" "${APM_INSTALL_URL}"; then
+			echo "[agent-skills] Error: could not download the APM installer" >&2
+			return 1
+		fi
+
+		if command -v sha256sum >/dev/null 2>&1; then
+			if ! checksum_output="$(sha256sum "${installer_file}")"; then
+				echo "[agent-skills] Error: could not calculate the APM installer checksum" >&2
+				return 1
+			fi
+		elif command -v shasum >/dev/null 2>&1; then
+			if ! checksum_output="$(shasum -a 256 "${installer_file}")"; then
+				echo "[agent-skills] Error: could not calculate the APM installer checksum" >&2
+				return 1
+			fi
+		else
+			echo "[agent-skills] Error: sha256sum or shasum is required to verify the APM installer" >&2
+			return 1
+		fi
+		if [[ "${checksum_output%% *}" != "${APM_INSTALL_SHA256}" ]]; then
+			echo "[agent-skills] Error: APM installer checksum verification failed" >&2
+			return 1
+		fi
+
+		if ! VERSION="v${APM_VERSION}" APM_INSTALL_DIR="${HOME}/.local/bin" \
+			APM_LIB_DIR="${HOME}/.local/lib/apm" APM_NO_MODIFY_PATH=1 sh "${installer_file}"; then
+			echo "[agent-skills] Error: APM installation failed" >&2
+			return 1
+		fi
+		apm_bin="${HOME}/.local/bin/apm"
+	fi
+
+	if ! version_output="$("${apm_bin}" --version 2>&1)"; then
+		echo "[agent-skills] Error: ${apm_bin} could not report its version" >&2
+		return 1
+	fi
+	if [[ "${version_output}" != *"Agent Package Manager"* ]]; then
+		echo "[agent-skills] Error: ${apm_bin} is not Microsoft Agent Package Manager" >&2
+		return 1
+	fi
+}
+
+sync_personal_skill_priority() {
+	local personal_skills="${HOME}/.copilot/ai-skills/skills"
+	local copilot_skills="${HOME}/.copilot/skills"
+	local shared_skills="${HOME}/.agents/skills"
+	local priority_skills="${HOME}/.github/skills"
+	local personal_dir skill_name copilot_dir shared_dir priority_dir
+	local conflicts=0
+	local skills_to_link=()
+
+	[[ -d "${personal_skills}" ]] || return 0
+	if [[ -L "${copilot_skills}" ]]; then
+		echo "[agent-skills] Error: ${copilot_skills} is a symlink; review it before migrating skills" >&2
+		return 1
+	fi
+
+	for personal_dir in "${personal_skills}"/*; do
+		[[ -f "${personal_dir}/SKILL.md" ]] || continue
+		skill_name="${personal_dir##*/}"
+		copilot_dir="${copilot_skills}/${skill_name}"
+		shared_dir="${shared_skills}/${skill_name}"
+		priority_dir="${priority_skills}/${skill_name}"
+		[[ -f "${copilot_dir}/SKILL.md" && -f "${shared_dir}/SKILL.md" ]] || continue
+		[[ "${copilot_dir}" -ef "${shared_dir}" ]] && continue
+
+		if [[ -e "${priority_dir}" && "${priority_dir}" -ef "${copilot_dir}" ]]; then
+			continue
+		elif [[ -e "${priority_dir}" || -L "${priority_dir}" ]]; then
+			echo "[agent-skills] Error: ${priority_dir} conflicts with the personal skill; keeping it" >&2
+			conflicts=$((conflicts + 1))
+		else
+			skills_to_link+=("${skill_name}")
+		fi
+	done
+
+	if [[ ${conflicts} -gt 0 ]]; then
+		echo "[agent-skills] Error: resolve the ${conflicts} personal skill conflict(s)" >&2
+		return 1
+	fi
+	if [[ ${#skills_to_link[@]} -eq 0 ]]; then
+		return 0
+	fi
+	if [[ -L "${priority_skills}" ]]; then
+		echo "[agent-skills] Error: ${priority_skills} is a symlink; review it before linking personal skills" >&2
+		return 1
+	fi
+	if ! mkdir -p "${priority_skills}"; then
+		echo "[agent-skills] Error: could not create ${priority_skills}" >&2
+		return 1
+	fi
+
+	# Copilot can treat shared skills as inherited when launched below $HOME.
+	for skill_name in "${skills_to_link[@]}"; do
+		if ! ln -s "${copilot_skills}/${skill_name}" "${priority_skills}/${skill_name}"; then
+			echo "[agent-skills] Error: could not link the personal skill ${skill_name}" >&2
+			return 1
+		fi
+		echo "[agent-skills] Linked personal skill for precedence: ${skill_name}"
+	done
+}
+
+backup_legacy_skills() {
+	local package_skills="${HOME}/.apm/apm_modules/github/agent-config/skills"
+	local deployed_skills="${HOME}/.agents/skills"
+	local legacy_skills="${HOME}/.copilot/skills"
+	local personal_skills="${HOME}/.copilot/ai-skills/skills"
+	local source_dir skill_name deployed_dir legacy_dir backup_dir=""
+	local deployed_count=0 conflicts=0
+	local skills_to_backup=()
+
+	if [[ ! -d "${package_skills}" || ! -d "${deployed_skills}" ]]; then
+		echo "[agent-skills] Error: APM did not deploy agent-config skills to ${deployed_skills}" >&2
+		return 1
+	fi
+	if [[ -L "${legacy_skills}" ]]; then
+		echo "[agent-skills] Error: ${legacy_skills} is a symlink; review it before migrating skills" >&2
+		return 1
+	fi
+
+	for source_dir in "${package_skills}"/*; do
+		[[ -f "${source_dir}/SKILL.md" ]] || continue
+		skill_name="${source_dir##*/}"
+		deployed_dir="${deployed_skills}/${skill_name}"
+		legacy_dir="${legacy_skills}/${skill_name}"
+		[[ -f "${deployed_dir}/SKILL.md" ]] || continue
+
+		if ! cmp -s "${source_dir}/SKILL.md" "${deployed_dir}/SKILL.md"; then
+			if [[ -e "${legacy_dir}" || -L "${legacy_dir}" ]]; then
+				echo "[agent-skills] Error: ${deployed_dir} does not match the APM package; keeping ${legacy_dir}" >&2
+				conflicts=$((conflicts + 1))
+			fi
+			continue
+		fi
+		deployed_count=$((deployed_count + 1))
+
+		if [[ -d "${personal_skills}/${skill_name}" ]]; then
+			continue
+		elif [[ -L "${legacy_dir}" ]]; then
+			if [[ -e "${legacy_dir}" && "${legacy_dir}" -ef "${deployed_dir}" ]]; then
+				continue
+			fi
+			echo "[agent-skills] Error: ${legacy_dir} is a non-personal link that overrides APM; keeping it" >&2
+			conflicts=$((conflicts + 1))
+		elif [[ -d "${legacy_dir}" ]]; then
+			skills_to_backup+=("${skill_name}")
+		fi
+	done
+
+	if [[ ${deployed_count} -eq 0 ]]; then
+		echo "[agent-skills] Error: no agent-config skills were found in ${deployed_skills}" >&2
+		return 1
+	fi
+	if [[ ${conflicts} -gt 0 ]]; then
+		echo "[agent-skills] Error: resolve the ${conflicts} skill conflict(s); no legacy folders were moved" >&2
+		return 1
+	fi
+	if [[ ${#skills_to_backup[@]} -eq 0 ]]; then
+		echo "[agent-skills] No legacy skill folders need a backup"
+		return 0
+	fi
+
+	backup_dir="$(mktemp -d "${HOME}/.copilot/skills-before-apm.XXXXXXXX")"
+	echo "[agent-skills] Backing up legacy skill folders to ${backup_dir}"
+	for skill_name in "${skills_to_backup[@]}"; do
+		if ! mv "${legacy_skills}/${skill_name}" "${backup_dir}/${skill_name}"; then
+			echo "[agent-skills] Error: could not back up ${legacy_skills}/${skill_name}; previous backups remain at ${backup_dir}" >&2
+			return 1
+		fi
+	done
+	echo "[agent-skills] Backed up ${#skills_to_backup[@]} legacy skill folder(s)"
+}
+
+if [[ $# -gt 0 ]]; then
+	if [[ $# -eq 1 && "$1" == "--sync-personal-priority" ]]; then
+		sync_personal_skill_priority
+		exit 0
+	fi
+	echo "[agent-skills] Error: unexpected argument(s): $*" >&2
+	exit 2
 fi
 
-# Create target directory
-echo "[agent-skills] Creating target directory: ${TARGET_DIR}"
-mkdir -p "${TARGET_DIR}"
+install_apm
 
-# Copy all skills from the repository
-if [[ -d "${TEMP_DIR}/skills" ]]; then
-    echo "[agent-skills] Copying skills to ${TARGET_DIR}..."
-    
-    # Count total skills
-    SKILL_COUNT=$(find "${TEMP_DIR}/skills" -mindepth 1 -maxdepth 1 -type d | wc -l)
-    echo "[agent-skills] Found ${SKILL_COUNT} skills to install"
-    
-    # Copy each skill directory
-    for skill_dir in "${TEMP_DIR}/skills"/*; do
-        if [[ -d "${skill_dir}" ]]; then
-            skill_name=$(basename "${skill_dir}")
-            echo "[agent-skills]   - Installing: ${skill_name}"
-            rm -rf "${TARGET_DIR:?}/${skill_name:?}"
-            if ! cp -r "${skill_dir}" "${TARGET_DIR}/${skill_name}"; then
-                echo "[agent-skills] Error: Failed to copy skill '${skill_name}'"
-                echo "[agent-skills] Please check permissions and disk space"
-                exit 1
-            fi
-        fi
-    done
-    
-    echo "[agent-skills] Successfully installed ${SKILL_COUNT} skills"
-else
-    echo "[agent-skills] Error: Skills directory not found in cloned repository"
-    exit 1
+echo "[agent-skills] Installing ${APM_PACKAGE} with APM"
+if ! (cd "${HOME}" && "${apm_bin}" install --global "${APM_PACKAGE}" --refresh --target copilot); then
+	echo "[agent-skills] Error: APM could not install ${APM_PACKAGE}; legacy skills were kept" >&2
+	exit 1
 fi
 
-# Clean up temp directory (also handled by the EXIT trap; explicit for clarity)
-echo "[agent-skills] Cleaning up temp directory"
-rm -rf -- "${TEMP_DIR}"
-
-# List installed skills
-echo "[agent-skills] Installed skills:"
-ls -1 "${TARGET_DIR}"
-
-echo "[agent-skills] Agent skills installation complete!"
-
-echo "[agent-skills] Installing gh-hubber-skills extension..."
-if ! gh extension install github/gh-hubber-skills; then
-    echo "[agent-skills] Error: Failed to install gh-hubber-skills extension"
-    echo "[agent-skills] Please check your network connection and gh authentication"
-    exit 1
-fi
-if ! gh hubber-skills install --all; then
-    echo "[agent-skills] Error: Failed to run 'gh hubber-skills install --all'"
-    exit 1
-fi
-echo "[agent-skills] gh-hubber-skills installation complete!"
+sync_personal_skill_priority
+backup_legacy_skills
+echo "[agent-skills] Agent skills installation complete"

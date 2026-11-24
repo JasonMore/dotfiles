@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Test mock for the Atuin setup script and Mergiraf release downloads.
+# Test mock for the Atuin and APM installers and Mergiraf downloads.
 # Everything else is unexpected in tests and fails loudly.
 set -euo pipefail
 
@@ -15,6 +15,38 @@ for arg in "$@"; do
 	esac
 	previous="${arg}"
 done
+
+if [[ "${url}" == "https://raw.githubusercontent.com/microsoft/apm/v0.35.0/install.sh" ]]; then
+	if [[ "${MOCK_CURL_APM_FAIL:-0}" == "1" ]]; then
+		echo "[mock-curl] simulated APM download failure" >&2
+		exit 1
+	fi
+	if [[ -z "${output_path}" ]]; then
+		echo "[mock-curl] APM installer requires an output path" >&2
+		exit 1
+	fi
+	cat > "${output_path}" <<'APM_INSTALLER'
+#!/usr/bin/env sh
+# mock APM installer
+set -eu
+if [ "${MOCK_APM_BOOTSTRAP_FAIL:-0}" = "1" ]; then
+	echo "[mock-apm-bootstrap] simulated installation failure" >&2
+	exit 1
+fi
+if [ "${VERSION:-}" != "v0.35.0" ] || [ "${APM_NO_MODIFY_PATH:-}" != "1" ] ||
+	[ "${APM_INSTALL_DIR:-}" != "${HOME}/.local/bin" ] ||
+	[ "${APM_LIB_DIR:-}" != "${HOME}/.local/lib/apm" ]; then
+	echo "[mock-apm-bootstrap] unexpected installer settings" >&2
+	exit 1
+fi
+mkdir -p "${APM_INSTALL_DIR}"
+cp "${MOCK_APM_BINARY}" "${APM_INSTALL_DIR}/apm"
+chmod +x "${APM_INSTALL_DIR}/apm"
+echo "[mock-apm-bootstrap] installed APM"
+APM_INSTALLER
+	echo "[mock-curl] downloaded APM installer"
+	exit 0
+fi
 
 if [[ "${url}" == https://codeberg.org/mergiraf/mergiraf/releases/download/* ]]; then
 	if [[ "${MOCK_CURL_MERGIRAF_FAIL:-0}" == "1" ]]; then

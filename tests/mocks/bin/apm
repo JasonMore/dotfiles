@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+case "$*" in
+	--version)
+		if [[ "${MOCK_APM_WRONG_BINARY:-0}" == "1" ]]; then
+			echo "Another package manager"
+		else
+			echo "Agent Package Manager (APM) CLI version 0.35.0"
+		fi
+		;;
+	"install --global github/agent-config --refresh --target copilot")
+		if [[ "${MOCK_APM_INSTALL_FAIL:-0}" == "1" ]]; then
+			echo "[mock-apm] simulated install failure" >&2
+			exit 1
+		fi
+		source_dir="${HOME}/.apm/apm_modules/github/agent-config/skills"
+		deployed_dir="${HOME}/.agents/skills"
+		mkdir -p "${source_dir}" "${deployed_dir}"
+		if [[ "${MOCK_APM_NO_SKILLS:-0}" != "1" ]]; then
+			for name in example-skill personal-skill linked-skill; do
+				mkdir -p "${source_dir}/${name}" "${deployed_dir}/${name}"
+				printf '%s\n' "---" "name: ${name}" "description: APM ${name}" "---" > "${source_dir}/${name}/SKILL.md"
+				cp "${source_dir}/${name}/SKILL.md" "${deployed_dir}/${name}/SKILL.md"
+			done
+			if [[ "${MOCK_APM_MISMATCH:-0}" == "1" ]]; then
+				echo "changed" >> "${deployed_dir}/example-skill/SKILL.md"
+			fi
+		fi
+		echo "[mock-apm] $*"
+		;;
+	*)
+		echo "[mock-apm] unexpected invocation: $*" >&2
+		exit 1
+		;;
+esac

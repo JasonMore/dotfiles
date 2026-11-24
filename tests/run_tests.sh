@@ -110,6 +110,34 @@ run_install() {
 		bash "${REPO_DIR}/install" 2>&1
 }
 
+run_agent_skills() {
+	local home_dir="$1"
+	shift
+	env -i \
+		HOME="${home_dir}" \
+		PATH="${MOCK_BIN}:${SAFE_PATH}" \
+		"$@" \
+		bash "${REPO_DIR}/install-agent-skills" 2>&1
+}
+
+run_agent_skills_bootstrap() {
+	local home_dir="$1"
+	shift
+	local bootstrap_bin="${home_dir}/bootstrap-bin" command_name
+	mkdir -p "${bootstrap_bin}"
+	ln -sf "${MOCK_BIN}/curl" "${bootstrap_bin}/curl"
+	ln -sf "${MOCK_BIN}/sha256sum" "${bootstrap_bin}/${MOCK_BOOTSTRAP_CHECKSUM:-sha256sum}"
+	for command_name in bash sh mkdir mktemp rm mv cp cmp chmod cat grep; do
+		ln -sf "$(command -v "${command_name}")" "${bootstrap_bin}/${command_name}"
+	done
+	env -i \
+		HOME="${home_dir}" \
+		PATH="${bootstrap_bin}" \
+		MOCK_APM_BINARY="${MOCK_BIN}/apm" \
+		"$@" \
+		bash "${REPO_DIR}/install-agent-skills" 2>&1
+}
+
 run_mergiraf_install() {
 	local home_dir="$1"
 	shift
@@ -210,25 +238,222 @@ ATUIN_ENV_EOF
 
 test_optional_failures_continue_to_later_steps() {
 	# gh-stack extension install fails; every later optional step (aliases,
-	# skill, copilot plugin, i-have-adhd, personal ai-skills) must still run.
-	# (Agent skills also uses `gh extension install` internally, so the same
-	# mock flag causes it to fail too -- exercising two independent
-	# failures continuing through to the end in a single run.)
+	# skill, copilot plugin, agent skills, i-have-adhd, personal ai-skills)
+	# must still run.
 	local home_dir output status=0
 	home_dir="$(fresh_home "optional-failure-continuation")"
 	output="$(run_install "${home_dir}" MOCK_GH_EXTENSION_FAIL=1)" || status=$?
 
 	assert_equals "${status}" "0"
-	assert_contains "${output}" "optional step failed (exit 1): Agent skills"
 	assert_contains "${output}" "optional step failed (exit 1): gh-stack extension"
 	assert_contains "${output}" "Optional step succeeded: gh-stack aliases"
 	assert_contains "${output}" "Optional step succeeded: gh-stack skill"
 	assert_contains "${output}" "Optional step succeeded: Copilot coder plugin"
+	assert_contains "${output}" "Optional step succeeded: Agent skills"
 	assert_contains "${output}" "Optional step succeeded: i-have-adhd skill"
 	assert_contains "${output}" "Optional step succeeded: Personal AI skills sync"
 	assert_contains "${output}" "Optional step succeeded: Personal AI skills install"
-	assert_contains "${output}" "Install finished with 2 optional step(s) needing attention"
+	assert_contains "${output}" "Install finished with 1 optional step(s) needing attention"
 	assert_contains "${output}" "gh-stack extension (exit 1)"
+}
+
+test_agent_skills_use_apm_locally_and_in_codespaces() {
+	local environment home_dir output status
+	for environment in local codespaces; do
+		home_dir="$(fresh_home "apm-${environment}")"
+		status=0
+		if [[ "${environment}" == "local" ]]; then
+			output="$(run_install "${home_dir}" CODESPACES=)" || status=$?
+		else
+			output="$(run_install "${home_dir}")" || status=$?
+		fi
+
+		assert_equals "${status}" "0"
+		assert_contains "${output}" "[mock-apm] install --global github/agent-config --refresh --target copilot"
+		assert_contains "${output}" "Optional step succeeded: Agent skills"
+		assert_not_contains "${output}" "hubber-skills"
+		assert_file_exists "${home_dir}/.agents/skills/example-skill/SKILL.md"
+	done
+}
+
+test_agent_skills_back_up_matching_folders_and_keep_personal_skills() {
+	local home_dir output backup_dir status=0
+	local backups=()
+	home_dir="$(fresh_home "apm-legacy-backup")"
+	mkdir -p "${home_dir}/.copilot/skills/example-skill" \
+		"${home_dir}/.copilot/skills/unrelated-skill" \
+		"${home_dir}/.copilot/ai-skills/skills/personal-skill"
+	echo "local changes" > "${home_dir}/.copilot/skills/example-skill/SKILL.md"
+	echo "unrelated" > "${home_dir}/.copilot/skills/unrelated-skill/SKILL.md"
+	echo "personal" > "${home_dir}/.copilot/ai-skills/skills/personal-skill/SKILL.md"
+	ln -s "${home_dir}/.copilot/ai-skills/skills/personal-skill" "${home_dir}/.copilot/skills/personal-skill"
+
+	output="$(run_agent_skills "${home_dir}")" || status=$?
+	assert_equals "${status}" "0"
+	assert_contains "${output}" "Backed up 1 legacy skill folder(s)"
+	backups=("${home_dir}"/.copilot/skills-before-apm.*)
+	assert_equals "${#backups[@]}" "1"
+	backup_dir="${backups[0]}"
+	assert_equals "$(cat "${backup_dir}/example-skill/SKILL.md")" "local changes"
+	if [[ -e "${home_dir}/.copilot/skills/example-skill" ]]; then
+		fail "the old skill must not hide the APM skill"
+	fi
+	assert_symlink_to "${home_dir}/.copilot/skills/personal-skill" "${home_dir}/.copilot/ai-skills/skills/personal-skill"
+	assert_symlink_to "${home_dir}/.github/skills/personal-skill" "${home_dir}/.copilot/skills/personal-skill"
+	assert_equals "$(cat "${home_dir}/.copilot/skills/unrelated-skill/SKILL.md")" "unrelated"
+	assert_file_exists "${home_dir}/.agents/skills/example-skill/SKILL.md"
+
+	output="$(run_agent_skills "${home_dir}")" || status=$?
+	assert_equals "${status}" "0"
+	assert_contains "${output}" "No legacy skill folders need a backup"
+	backups=("${home_dir}"/.copilot/skills-before-apm.*)
+	assert_equals "${#backups[@]}" "1"
+}
+
+test_agent_skills_preserve_existing_personal_priority_conflicts() {
+	local home_dir output status=0
+	home_dir="$(fresh_home "apm-personal-priority-conflict")"
+	mkdir -p "${home_dir}/.copilot/skills/example-skill" \
+		"${home_dir}/.copilot/ai-skills/skills/personal-skill" \
+		"${home_dir}/.github/skills/personal-skill"
+	echo "keep legacy" > "${home_dir}/.copilot/skills/example-skill/SKILL.md"
+	echo "personal" > "${home_dir}/.copilot/ai-skills/skills/personal-skill/SKILL.md"
+	echo "keep priority" > "${home_dir}/.github/skills/personal-skill/SKILL.md"
+	ln -s "${home_dir}/.copilot/ai-skills/skills/personal-skill" "${home_dir}/.copilot/skills/personal-skill"
+
+	output="$(run_agent_skills "${home_dir}")" || status=$?
+	assert_equals "${status}" "1"
+	assert_contains "${output}" "conflicts with the personal skill"
+	assert_equals "$(cat "${home_dir}/.github/skills/personal-skill/SKILL.md")" "keep priority"
+	assert_equals "$(cat "${home_dir}/.copilot/skills/example-skill/SKILL.md")" "keep legacy"
+	assert_symlink_to "${home_dir}/.copilot/skills/personal-skill" "${home_dir}/.copilot/ai-skills/skills/personal-skill"
+	if compgen -G "${home_dir}/.copilot/skills-before-apm.*" >/dev/null; then
+		fail "personal priority conflicts must be found before creating a backup"
+	fi
+}
+
+test_agent_skills_failures_keep_legacy_folders() {
+	local failure home_dir output status
+	for failure in MOCK_APM_INSTALL_FAIL MOCK_APM_NO_SKILLS MOCK_APM_MISMATCH; do
+		home_dir="$(fresh_home "apm-failure-${failure}")"
+		mkdir -p "${home_dir}/.copilot/skills/example-skill"
+		echo "keep me" > "${home_dir}/.copilot/skills/example-skill/SKILL.md"
+		status=0
+		output="$(run_agent_skills "${home_dir}" "${failure}=1")" || status=$?
+
+		assert_equals "${status}" "1"
+		assert_contains "${output}" "[agent-skills] Error:"
+		assert_equals "$(cat "${home_dir}/.copilot/skills/example-skill/SKILL.md")" "keep me"
+		if compgen -G "${home_dir}/.copilot/skills-before-apm.*" >/dev/null; then
+			fail "a failed APM install must not move legacy folders"
+		fi
+	done
+}
+
+test_agent_skills_preserve_unrelated_links_before_any_backup() {
+	local home_dir output status=0
+	home_dir="$(fresh_home "apm-link-conflict")"
+	mkdir -p "${home_dir}/.copilot/skills/example-skill" "${home_dir}/custom/linked-skill"
+	echo "keep me" > "${home_dir}/.copilot/skills/example-skill/SKILL.md"
+	echo "custom" > "${home_dir}/custom/linked-skill/SKILL.md"
+	ln -s "${home_dir}/custom/linked-skill" "${home_dir}/.copilot/skills/linked-skill"
+
+	output="$(run_agent_skills "${home_dir}")" || status=$?
+	assert_equals "${status}" "1"
+	assert_contains "${output}" "non-personal link that overrides APM"
+	assert_contains "${output}" "no legacy folders were moved"
+	assert_equals "$(cat "${home_dir}/.copilot/skills/example-skill/SKILL.md")" "keep me"
+	assert_symlink_to "${home_dir}/.copilot/skills/linked-skill" "${home_dir}/custom/linked-skill"
+	if compgen -G "${home_dir}/.copilot/skills-before-apm.*" >/dev/null; then
+		fail "link conflicts must be found before creating a backup"
+	fi
+}
+
+test_agent_skills_preserve_a_symlinked_skills_directory() {
+	local home_dir output status=0
+	home_dir="$(fresh_home "apm-symlinked-root")"
+	mkdir -p "${home_dir}/.copilot" "${home_dir}/custom-skills/example-skill"
+	echo "keep me" > "${home_dir}/custom-skills/example-skill/SKILL.md"
+	ln -s "${home_dir}/custom-skills" "${home_dir}/.copilot/skills"
+
+	output="$(run_agent_skills "${home_dir}")" || status=$?
+	assert_equals "${status}" "1"
+	assert_contains "${output}" "is a symlink; review it before migrating skills"
+	assert_equals "$(cat "${home_dir}/custom-skills/example-skill/SKILL.md")" "keep me"
+}
+
+test_agent_skills_bootstrap_and_reuse_apm_outside_path() {
+	local home_dir output status=0
+	home_dir="$(fresh_home "apm-bootstrap")"
+
+	output="$(run_agent_skills_bootstrap "${home_dir}")" || status=$?
+	assert_equals "${status}" "0"
+	assert_contains "${output}" "[mock-curl] downloaded APM installer"
+	assert_contains "${output}" "[mock-apm-bootstrap] installed APM"
+	assert_file_exists "${home_dir}/.local/bin/apm"
+	assert_file_exists "${home_dir}/.agents/skills/example-skill/SKILL.md"
+
+	output="$(run_agent_skills_bootstrap "${home_dir}" MOCK_CURL_APM_FAIL=1)" || status=$?
+	assert_equals "${status}" "0"
+	assert_contains "${output}" "Using APM at ${home_dir}/.local/bin/apm"
+	assert_not_contains "${output}" "simulated APM download failure"
+}
+
+test_agent_skills_bootstrap_with_shasum() {
+	local home_dir output status=0
+	home_dir="$(fresh_home "apm-bootstrap-shasum")"
+	output="$(MOCK_BOOTSTRAP_CHECKSUM=shasum run_agent_skills_bootstrap "${home_dir}")" || status=$?
+	assert_equals "${status}" "0"
+	assert_contains "${output}" "[mock-apm-bootstrap] installed APM"
+	assert_file_exists "${home_dir}/.agents/skills/example-skill/SKILL.md"
+
+	home_dir="$(fresh_home "apm-bootstrap-shasum-mismatch")"
+	status=0
+	output="$(MOCK_BOOTSTRAP_CHECKSUM=shasum run_agent_skills_bootstrap "${home_dir}" MOCK_APM_CHECKSUM_FAIL=1)" || status=$?
+	assert_equals "${status}" "1"
+	assert_contains "${output}" "checksum verification failed"
+	if [[ -e "${home_dir}/.local/bin/apm" ]]; then
+		fail "a checksum mismatch must not install APM"
+	fi
+}
+
+test_agent_skills_bootstrap_failures_keep_existing_files() {
+	local failure home_dir output status
+	for failure in MOCK_CURL_APM_FAIL MOCK_APM_CHECKSUM_FAIL MOCK_APM_BOOTSTRAP_FAIL; do
+		home_dir="$(fresh_home "apm-bootstrap-${failure}")"
+		mkdir -p "${home_dir}/.copilot/skills/example-skill"
+		echo "keep me" > "${home_dir}/.copilot/skills/example-skill/SKILL.md"
+		status=0
+		output="$(run_agent_skills_bootstrap "${home_dir}" "${failure}=1")" || status=$?
+
+		assert_equals "${status}" "1"
+		assert_contains "${output}" "[agent-skills] Error:"
+		assert_equals "$(cat "${home_dir}/.copilot/skills/example-skill/SKILL.md")" "keep me"
+		if [[ -e "${home_dir}/.local/bin/apm" ]]; then
+			fail "a failed APM bootstrap must not install an executable"
+		fi
+	done
+}
+
+test_agent_skills_reject_an_unrelated_apm_executable() {
+	local home_dir output status=0
+	home_dir="$(fresh_home "apm-wrong-binary")"
+	output="$(run_agent_skills "${home_dir}" MOCK_APM_WRONG_BINARY=1)" || status=$?
+	assert_equals "${status}" "1"
+	assert_contains "${output}" "is not Microsoft Agent Package Manager"
+	assert_not_contains "${output}" "[mock-apm] install"
+}
+
+test_agent_skills_failure_does_not_abort_install() {
+	local home_dir output status=0
+	home_dir="$(fresh_home "apm-optional-failure")"
+	output="$(run_install "${home_dir}" MOCK_APM_INSTALL_FAIL=1)" || status=$?
+
+	assert_equals "${status}" "0"
+	assert_contains "${output}" "optional step failed (exit 1): Agent skills"
+	assert_contains "${output}" "Optional step succeeded: Mergiraf"
+	assert_contains "${output}" "Optional step succeeded: Personal AI skills install"
+	assert_contains "${output}" "Agent skills (exit 1)"
 }
 
 test_gh_stack_skill_install_is_noninteractive_and_global() {
@@ -564,6 +789,7 @@ test_personal_ai_skills_install_last_and_present() {
 
 	assert_equals "${status}" "0"
 	assert_file_exists "${home_dir}/.copilot/ai-skills/.marker/personal-ai-skills-installed"
+	assert_symlink_to "${home_dir}/.github/skills/example-skill" "${home_dir}/.copilot/skills/example-skill"
 
 	# Ordering: the personal AI skills steps must be the last two "Optional
 	# step:" lines emitted, after every other Codespaces optional integration.
@@ -643,6 +869,17 @@ run_test test_partial_atuin_secrets_reports_only_missing_vars
 run_test test_atuin_network_failure_does_not_abort_install
 run_test test_existing_atuin_outside_path_is_reused
 run_test test_optional_failures_continue_to_later_steps
+run_test test_agent_skills_use_apm_locally_and_in_codespaces
+run_test test_agent_skills_back_up_matching_folders_and_keep_personal_skills
+run_test test_agent_skills_preserve_existing_personal_priority_conflicts
+run_test test_agent_skills_failures_keep_legacy_folders
+run_test test_agent_skills_preserve_unrelated_links_before_any_backup
+run_test test_agent_skills_preserve_a_symlinked_skills_directory
+run_test test_agent_skills_bootstrap_and_reuse_apm_outside_path
+run_test test_agent_skills_bootstrap_with_shasum
+run_test test_agent_skills_bootstrap_failures_keep_existing_files
+run_test test_agent_skills_reject_an_unrelated_apm_executable
+run_test test_agent_skills_failure_does_not_abort_install
 run_test test_gh_stack_skill_install_is_noninteractive_and_global
 run_test test_i_have_adhd_skill_install_is_noninteractive_and_global
 run_test test_impeccable_installs_to_agents_skills_and_reruns

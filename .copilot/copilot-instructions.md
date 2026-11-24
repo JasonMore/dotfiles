@@ -3,6 +3,8 @@
 ## Writing style
 
 - Use ASD-STE100 Simplified Technical English for all written content, including issue and pull request titles, descriptions, and comments; documentation; and messages.
+- Use plain language when explaining technical work. Explain unfamiliar terms instead of assuming I know them.
+- Support investigation findings with direct source links. If no URL exists, identify the source or local file and line instead. Do not invent links.
 - Create and update personal skills in `JasonMore/ai-skills` under its `skills/` directory. Treat that repository as the source of truth.
 - Run `JasonMore/ai-skills`'s installer to symlink each personal skill into `~/.copilot/skills/`. Do not leave the only copy in a session, worktree, dotfiles, or user config directory.
 - Before finishing skill work, validate the skill, commit it in `JasonMore/ai-skills`, and push it to GitHub.
@@ -81,7 +83,6 @@ Explain in full when asked. Confirm destructive actions. After three failed fixe
 - **Reviewer approval always blocks force-push.** Never auto force-push to an approved PR, even if it is a draft or CI is failing. Ask for explicit confirmation first.
 - In any other case (PR is not a draft and CI is passing, or status is unknown), do not force push without explicit user confirmation.
 - Always use `--force-with-lease`, never plain `git push --force` or `git push -f`.
-- Do not address PR review comments if the PR is already mergeable. If the merge status is mergeable, stop and ask whether to address the comments before making changes.
 
 ## Notifications
 

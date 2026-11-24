@@ -1,22 +1,45 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+if [[ $# -eq 3 && "$1" == "-a" && "$2" == "256" ]]; then
+	shift 2
+fi
+
+if [[ $# -eq 1 ]]; then
+	file="$1"
+	if [[ ! -s "${file}" ]] || ! grep -q '^# mock APM installer$' "${file}"; then
+		echo "[mock-sha256sum] missing APM installer" >&2
+		exit 1
+	fi
+	if [[ "${MOCK_APM_CHECKSUM_FAIL:-0}" == "1" ]]; then
+		printf '%064d  %s\n' 0 "${file}"
+	else
+		printf '%s  %s\n' "0e813353630c02a9eb961fbad82cf916967e855aa84a533940975c5d699c9caa" "${file}"
+	fi
+	exit 0
+fi
+
 if [[ "$*" != "--check --status" ]]; then
 	echo "[mock-sha256sum] unexpected command: $*" >&2
 	exit 1
 fi
+IFS= read -r entry
+file="${entry#*  }"
+if [[ ! -s "${file}" ]]; then
+	echo "[mock-sha256sum] missing downloaded file" >&2
+	exit 1
+fi
+
 if [[ "${MOCK_MERGIRAF_CHECKSUM_FAIL:-0}" == "1" ]]; then
 	echo "[mock-sha256sum] simulated checksum mismatch" >&2
 	exit 1
 fi
-
 case "${MOCK_UNAME_ARCH:-x86_64}" in
 	x86_64) expected="fc77469be936b02ab9021b984a3aebc9250a21ae3d264f2ef2198eb8b31b2a7b" ;;
 	aarch64 | arm64) expected="0f153dfa85a799c0d05ee7a21834d049b3595e367ed411a56f007bdb5de8c19d" ;;
 	*) echo "[mock-sha256sum] unexpected architecture" >&2; exit 1 ;;
 esac
-IFS= read -r entry
-if [[ "${entry}" != "${expected}  "* || ! -s "${entry#*  }" ]]; then
-	echo "[mock-sha256sum] unexpected checksum or missing archive" >&2
+if [[ "${entry}" != "${expected}  "* ]]; then
+	echo "[mock-sha256sum] unexpected Mergiraf checksum" >&2
 	exit 1
 fi

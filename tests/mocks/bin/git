@@ -25,6 +25,10 @@ set -euo pipefail
 echo "[mock-ai-skills] install ran"
 mkdir -p "$(dirname "$0")/.marker"
 date +%s > "$(dirname "$0")/.marker/personal-ai-skills-installed"
+mkdir -p "${HOME}/.copilot/skills"
+if [[ ! -L "${HOME}/.copilot/skills/example-skill" ]]; then
+	ln -s "$(dirname "$0")/skills/example-skill" "${HOME}/.copilot/skills/example-skill"
+fi
 INSTALL_EOF
 		chmod +x "${target}/install"
 	fi
